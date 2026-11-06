@@ -1,7 +1,7 @@
 # Development
 
 This guide covers building Plamonic from source, running its tests, and how releases and updates are made. The
-[README](../README.md) has the overview, and [DESIGN.md](DESIGN.md) (Japanese) explains how the app works.
+[README](../README.en.md) has the overview, and [DESIGN.md](DESIGN.md) (Japanese) explains how the app works.
 
 ## Requirements
 
