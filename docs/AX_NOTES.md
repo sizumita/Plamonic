@@ -9,7 +9,7 @@ Slack 435 要素 25ms、Discord 1700 要素 62ms、Safari 318 要素 20ms、メ�
 
 ## Chromium / Electron 共通
 
-- Electron アプリは `AXManualAccessibility = true` を設定すると、数秒後に Web 部分の AX ツリーが現れる
+- Electron アプリに `AXManualAccessibility = true` を設定すると、数秒後に Web 部分の AX ツリーが現れる
   （`AXEnhancedUserInterface` は Electron では未対応 = -25208）。
 - Chromium は `AXDOMClassList`（DOM の class 一覧）を公開するので、アプリ別ルールは主に DOM クラス接頭辞で書く。
 - Chromium は AX の frame をスクロール領域で切り取って返す。仮想リストの画面外の項目は、スクロール領域の上端に
@@ -19,7 +19,7 @@ Slack 435 要素 25ms、Discord 1700 要素 62ms、Safari 318 要素 20ms、メ�
 
 ### 原文の見た目
 
-- AXStaticText は `AXNumberOfCharacters` / `AXAttributedStringForRange` に答えないが、`AXTextMarkerRangeForUIElement` →
+- AXStaticText は `AXNumberOfCharacters` / `AXAttributedStringForRange` の値を返さないが、`AXTextMarkerRangeForUIElement` →
   `AXAttributedStringForTextMarkerRange` で `AXFont = {AXFontSize}`（ファミリ名なし）と `AXForegroundColor`（CGColor）が
   取れる。`AXAttributedStringForTextMarkerRangeWithOptions` は -25212。
 - run の矩形は文字の大きさと同じ高さ（16px の文字で 16pt）で、ラテン文字のディセンダは矩形の下にはみ出す。
@@ -27,7 +27,7 @@ Slack 435 要素 25ms、Discord 1700 要素 62ms、Safari 318 要素 20ms、メ�
 
 ### リンク
 
-テスト用のページを、一時プロファイルの Chrome で確認した。
+テスト用のページを一時プロファイルの Chrome で確認した。
 
 - リンクは `AXLink`（子に `AXStaticText`）。強調などで深くなっても、`AXLink` の下の文字はすべてリンクの一部。
 - `AXURL` は 1 回 0.05〜0.2ms。ページ内のリンク（`#target`）は `file://…#target` を返す。
@@ -72,7 +72,7 @@ AXGroup dom=scroller__* (可視領域)
 - 返信のプレビュー（`repliedTextContent_`）も `messageContent_` を持つので除外する。`timestamp_` は本文中の「(編集済)」。
 - メンション（role="button" の span）は子のない `AXButton` として出る。URL はなく、押すしかない。
 
-## Claude デスクトップ（com.anthropic.claudefordesktop）— Claude Code タブ
+## Claude デスクトップ（com.anthropic.claudefordesktop）の Claude Code タブ
 
 Tailwind のユーティリティクラスが中心。メッセージ単位は `group/message-row`。
 ツール実行などの状態行は `group/status`（除外）。`sr-only` はスクリーンリーダー専用の重複テキスト（除外）。
@@ -106,9 +106,9 @@ Electron。Web 部分の AX ツリーはまだ確かめていない（起動直�
 ## Google Chrome
 
 - Chrome（Electron ではない）は `AXManualAccessibility` に -25205（attributeUnsupported）を返す。一時プロファイルの
-  Chrome は `--force-renderer-accessibility`（または `AXEnhancedUserInterface`）でないと Web 部分の木を出さない。
+  Chrome は `--force-renderer-accessibility`（または `AXEnhancedUserInterface`）でないと Web 部分の AX ツリーを出さない。
   ふだんの Chrome は、ほかの支援アプリがオンにしていないと読めないことがある。
-- テスト用に Chrome を起動すると、`open -n -g` でも約 2 秒後に前面に出る。macOS は、ほかのアプリで押したリンクを
+- テスト用に Chrome を起動すると、`open -n -g` でも約 2 秒後に前面に出る。macOS はほかのアプリで押したリンクを
   いちばん新しい Chrome のインスタンスで開くことがある。
 
 ## ターミナル（Claude Code / Codex / OpenCode の CLI）
@@ -120,15 +120,15 @@ AXWindow → AXSplitGroup → AXScrollArea → AXTextArea (value = 画面のテ�
 ```
 
 - `AXVisibleCharacterRange` と `AXBoundsForRange` で可視行とその矩形を得る。TUI の罫線（│╭╮╰╯─）、スピナー行、
-  プロンプト行を除き、折り返された行を連結して段落にする。Claude Code 風の画面では、罫線・ツール呼び出し・スピナー行を
+  プロンプト行を除き、折り返された行を連結して段落にする。Claude Code 風の画面では罫線・ツール呼び出し・スピナー行を
   除いた 5 段落を 5〜15 ms で読む。
 - `AXBoundsForRange` はセルの矩形（例 9x17）を返すが、`AXAttributedStringForRange` と `AXTextMarkerRangeForUIElement`
   は -25213。罫線などの AXStaticText は `AXFont = {}`。
 - ウインドウ幅で折り返された行は値の中では 1 行で、その範囲の矩形は複数行の外接矩形（例 1080x34）になる。
 
-Ghostty（com.mitchellh.ghostty）は AXTextArea の値と `AXVisibleCharacterRange` は読めるが、`AXBoundsForRange` がない。
+Ghostty（com.mitchellh.ghostty）では AXTextArea の値と `AXVisibleCharacterRange` は読めるが、`AXBoundsForRange` がない。
 行の矩形が取れないので、今はターミナルモードで訳せない（`AXLineForIndex` は画面上の行ではなく論理行を数える）。
 
 ## 画面のロック中
 
-画面がロックされている間、AX の窓は `AXApplication` を返し（frame なし）、走査は何も見つけない（Terminal・Chrome・Finder で確認）。
+画面がロックされている間、AX の窓は `AXApplication` を返し（frame なし）、走査しても何も見つからない（Terminal・Chrome・Finder で確認）。
