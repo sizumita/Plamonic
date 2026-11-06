@@ -42,12 +42,6 @@ and right-clicking one opens the app's own menu, such as Copy Link Address.
 
 Hold ⌥ (Option) to see the original. Rest the pointer on a translation to see its original in a tooltip.
 
-### Keeps up while you read
-
-New text is first translated by a small model (0.8B), so a draft appears at once, and then refined from the top by a
-larger model (2B). When a lot of text arrives at once, from scrolling or a burst of messages, Plamonic puts drafts
-first and refines later. Translations are cached, so text you have seen before appears instantly.
-
 ### Stays on your Mac
 
 Plamonic reads text from apps through the macOS Accessibility API, not from screenshots or OCR. The models run on
@@ -68,18 +62,22 @@ also translate the whole window, just the paragraph under the pointer, or just t
 
 ## Supported apps
 
-| App | What is translated | Status |
-| --- | --- | --- |
-| Slack | Message text | Tested |
-| Discord | Message text and embed descriptions | Tested |
-| Claude (Claude Code tab) | Chat messages | Tested |
-| OpenCode (desktop) | Body paragraphs | Tested |
-| Terminal | Output, for example from the Claude Code, Codex and OpenCode CLIs | Tested |
-| iTerm2, Codex, DeepSeek Harness | Presets of the same kind | Not yet tested |
+| | App | What is translated |
+| :---: | --- | --- |
+| ✅ | Slack | Message text |
+| ✅ | Discord | Message text and embed descriptions |
+| ✅ | Claude (Claude Code tab) | Chat messages |
+| ✅ | OpenCode (desktop) | Body paragraphs |
+| ✅ | Terminal | Output, for example from the Claude Code, Codex and OpenCode CLIs |
+| 🟡 | iTerm2 | Output, the same way as Terminal |
+| 🟡 | Codex (desktop) | Chat messages |
+| 🟡 | DeepSeek Harness | Chat messages |
+| ❌ | Ghostty | Not supported: it does not tell macOS where its characters are |
+
+✅ Tested　🟡 Preset included, not yet tested　❌ Not supported
 
 Most other apps work too. They start in manual mode: press ⌃⌥R when you want a translation. To choose what gets
 translated, use 要素を調べる (inspect element) in 設定 › アプリ and point at the text.
-Ghostty does not tell macOS where its characters are, so Plamonic cannot translate it yet.
 
 ## Getting started
 
