@@ -60,17 +60,3 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
-
-private struct MenuBarIcon: View {
-    @ObservedObject var controller: AppController
-    @ObservedObject var settings: SettingsStore
-
-    var body: some View {
-        Image(systemName: symbol)
-    }
-
-    private var symbol: String {
-        if !controller.accessibilityTrusted { return "exclamationmark.bubble" }
-        return settings.global.isEnabled ? "character.bubble.fill" : "character.bubble"
-    }
-}

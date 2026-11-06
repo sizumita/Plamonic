@@ -2,8 +2,8 @@
 import AppKit
 import SwiftUI
 
-/// `--render-check <dir>` (Debug builds): renders the onboarding view and the PLaMo license sheet
-/// to PNG files offscreen and exits.
+/// `--render-check <dir>` (Debug builds): renders the onboarding view, the PLaMo license sheet and
+/// the menu bar icons to PNG files offscreen and exits.
 /// Nothing is put on screen and the app is never activated.
 @MainActor
 enum RenderCheck {
@@ -22,6 +22,8 @@ enum RenderCheck {
                    to: directory.appendingPathComponent("onboarding-\(name).png"))
             render(PlamoLicenseView(), size: CGSize(width: 640, height: 560), appearance: appearance,
                    to: directory.appendingPathComponent("license-\(name).png"))
+            render(MenuBarIconPreview(), size: nil, appearance: appearance,
+                   to: directory.appendingPathComponent("menubar-icon-\(name).png"))
         }
         exit(0)
     }
@@ -36,6 +38,28 @@ enum RenderCheck {
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
         print("wrote \(url.path) \(Int(view.bounds.width))x\(Int(view.bounds.height))")
+    }
+}
+
+/// The menu bar icon in each state, at menu bar size and enlarged.
+private struct MenuBarIconPreview: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach([1.0, 4.0], id: \.self) { zoom in
+                HStack(spacing: 16 * zoom) {
+                    ForEach(MenuBarIconImage.State.allCases, id: \.self) { state in
+                        let image = MenuBarIconImage.image(for: state)
+                        Image(nsImage: image)
+                            .resizable()
+                            .renderingMode(.template)
+                            .frame(width: image.size.width * zoom, height: image.size.height * zoom)
+                    }
+                }
+            }
+        }
+        .foregroundStyle(.primary)
+        .padding(16)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 #endif
