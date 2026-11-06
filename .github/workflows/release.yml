@@ -12,7 +12,7 @@
 #
 # - "version" counts the version from the history. "build" compiles the app without secrets. "sign" runs in the
 #   environment that holds the signing secrets, "beta" (main) or "production" (release tags), and runs only Apple's
-#   tools, SwiftPM (to fetch Sparkle's tools) and Sparkle's sign_update besides the scripts in scripts/: it signs the
+#   tools, curl (to fetch Sparkle's tools) and Sparkle's sign_update besides the scripts in scripts/: it signs the
 #   app, has Apple notarize it, and makes the update archive, signed with the update key, and the disk image. "publish"
 #   is the only job whose GITHUB_TOKEN may write to the repository (the releases and the tag "beta"); it runs the gh
 #   CLI and scripts/appcast.sh, and uploads each feed last, once the files that it names are in place. It never takes
@@ -227,7 +227,7 @@ jobs:
       - name: Unpack the app
         run: ditto -x -k "${RUNNER_TEMP}/unsigned/Plamonic.app.zip" "${RUNNER_TEMP}/app"
 
-      # SwiftPM fetches Sparkle alone, at the revision of the app's Package.resolved, and checks its archive.
+      # Sparkle's archive, at the revision of the app's Package.resolved, checked against the SHA-256 in its manifest.
       - name: Get Sparkle's tools
         run: |
           bin="$(scripts/sparkle-tools.sh "${RUNNER_TEMP}/sparkle")"
