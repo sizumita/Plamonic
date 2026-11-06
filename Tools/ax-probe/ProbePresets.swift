@@ -79,6 +79,8 @@ enum ProbePresets {
                     "AXLandmarkNavigation", "AXLandmarkBanner", "AXLandmarkComplementary", "AXLandmarkContentInfo",
                 ]),
                 m(dom: ["sr-only", "hljs", "code-block", "language-", "katex", "cm-editor", "monaco-editor"]),
+                // Sidebar thread lists (DeepSeek Harness).
+                m(roles: ["AXOutline"]),
             ]
         },
         Preset(name: "none", bundleIDs: []) { p in
