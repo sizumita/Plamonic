@@ -16,7 +16,10 @@ if [[ ! -x "$xcode/Contents/Developer/usr/bin/xcodebuild" ]]; then
   exit 1
 fi
 export DEVELOPER_DIR="$xcode/Contents/Developer"
-version="$(xcodebuild -version | head -n 1)"
+# Read xcodebuild's whole output before looking at it: piping it into head or grep -q closes the pipe early, and
+# xcodebuild then crashes on the broken pipe.
+version_output="$(xcodebuild -version)"
+version="${version_output%%$'\n'*}"
 if [[ ! "$version" =~ ^Xcode\ ${major}(\.|$) ]]; then
   echo "::error::$xcode is $version, not Xcode $major."
   exit 1
@@ -26,7 +29,8 @@ xcodebuild -version
 xcrun swift --version
 
 if [[ "${2:-}" == --metal ]]; then
-  if xcodebuild -showComponent MetalToolchain 2>/dev/null | grep -q 'Status: installed'; then
+  metal_status="$(xcodebuild -showComponent MetalToolchain 2>/dev/null || true)"
+  if [[ "$metal_status" == *'Status: installed'* ]]; then
     echo "The Metal toolchain is installed."
   else
     xcodebuild -downloadComponent MetalToolchain
