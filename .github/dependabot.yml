@@ -1,0 +1,29 @@
+# Every Monday, Dependabot looks for upgrades of the Swift packages and of the actions, and proposes one only once the
+# new release has been published for 30 days (cooldown). Security updates do not wait.
+
+version: 2
+
+updates:
+  # PlamoKit's packages (Packages/PlamoKit/Package.swift and its Package.resolved). Dependabot does not read the Xcode
+  # project: Sparkle (project.yml) is upgraded by hand, and an upgrade of mlx-swift also needs the app's
+  # Package.resolved in the same pull request (docs/DEVELOPMENT.md, "Dependencies").
+  - package-ecosystem: swift
+    directory: /Packages/PlamoKit
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 30
+
+  # The actions stay pinned to full commit SHAs; Dependabot updates the SHA and the version in the comment beside it.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 30
+    groups:
+      actions:
+        patterns:
+          - "*"

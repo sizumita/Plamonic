@@ -1,0 +1,98 @@
+name: Plamonic
+options:
+  bundleIdPrefix: io.smdr
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+  developmentLanguage: ja
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    # MLX runs on Apple Silicon only.
+    ARCHS: arm64
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    # CFBundleShortVersionString and CFBundleVersion. Release builds pass both (scripts/version.sh).
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Sparkle's EdDSA public key (SUPublicEDKey). Empty: the build never updates itself.
+    PLAMONIC_SPARKLE_PUBLIC_KEY: ""
+packages:
+  PlamoKit:
+    path: Packages/PlamoKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
+targets:
+  Plamonic:
+    type: application
+    platform: macOS
+    sources:
+      - path: Plamonic
+        excludes:
+          - "Resources/Info.plist"
+      # Copied into Contents/Resources: the app's license and the notices of the code built into it.
+      - path: LICENSE
+        buildPhase: resources
+      - path: THIRD_PARTY_NOTICES.md
+        buildPhase: resources
+      - path: LICENSES
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: PlamoKit
+        product: PlamoKit
+      - package: Sparkle
+        product: Sparkle
+    info:
+      path: Plamonic/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Plamonic
+        CFBundleName: Plamonic
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: "Copyright © 2026 sizumita"
+        # Sparkle. No SUFeedURL: UpdateController picks the stable or the beta feed.
+        SUPublicEDKey: $(PLAMONIC_SPARKLE_PUBLIC_KEY)
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+    entitlements:
+      path: Plamonic/Resources/Plamonic.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.smdr.Plamonic
+        PRODUCT_NAME: Plamonic
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  PlamonicTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: PlamonicTests
+    dependencies:
+      - target: Plamonic
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.smdr.PlamonicTests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Plamonic:
+    build:
+      targets:
+        Plamonic: all
+        PlamonicTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - PlamonicTests

@@ -1,0 +1,13 @@
+// Default: ad-hoc signing so the project builds on any Mac.
+// Ad-hoc signatures change on every build, which makes macOS forget the Accessibility permission.
+// Put a stable identity in Signing.local.xcconfig (not shared) to keep the permission across builds.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+// The hardened runtime only with a team: under it, macOS loads no ad-hoc-signed framework (Sparkle) into an
+// ad-hoc-signed app. Releases get it from scripts/sign-app.sh.
+PLAMONIC_HARDENED_RUNTIME_ = NO
+ENABLE_HARDENED_RUNTIME = $(PLAMONIC_HARDENED_RUNTIME_$(DEVELOPMENT_TEAM):default=YES)
+
+#include? "Signing.local.xcconfig"

@@ -1,0 +1,10 @@
+.DS_Store
+build/
+DerivedData/
+.build/
+.swiftpm/
+*.xcuserstate
+xcuserdata/
+Config/Signing.local.xcconfig
+Packages/PlamoKit/.build/
+*.profraw

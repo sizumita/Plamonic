@@ -1,0 +1,483 @@
+# Builds Plamonic, signs it with the team's Developer ID, has Apple notarize it, and publishes it with the Sparkle feeds
+# that the installed apps update from (docs/DEVELOPMENT.md, "Releases" and "Updates").
+#
+# - Every push to main that changes the app builds a beta, version X.Y.Z-beta.N (scripts/version.sh). It replaces the
+#   files of the prerelease "beta", whose tag moves to the commit: Plamonic-Beta.dmg, Plamonic-Beta.zip and appcast.xml
+#   at https://github.com/sizumita/Plamonic/releases/download/beta/.
+# - Every tag vX.Y.Z on a commit of main builds that release, version X.Y.Z, and publishes it as the tag's release:
+#   Plamonic.dmg, Plamonic.zip and appcast.xml at https://github.com/sizumita/Plamonic/releases/latest/download/.
+# - Betas and releases are the same app, io.smdr.Plamonic. A release's appcast.xml lists that release. The beta's lists
+#   the newest beta and the newest release, so that an app that takes betas also gets a release newer than its beta.
+#   Sparkle compares the build numbers, which count the commits of HEAD and grow with every build.
+#
+# - "version" counts the version from the history. "build" compiles the app without secrets. "sign" runs in the
+#   environment that holds the signing secrets, "beta" (main) or "production" (release tags), and runs only Apple's
+#   tools, SwiftPM (to fetch Sparkle's tools) and Sparkle's sign_update besides the scripts in scripts/: it signs the
+#   app, has Apple notarize it, and makes the update archive, signed with the update key, and the disk image. "publish"
+#   is the only job whose GITHUB_TOKEN may write to the repository (the releases and the tag "beta"); it runs the gh
+#   CLI and scripts/appcast.sh, and uploads each feed last, once the files that it names are in place. It never takes
+#   the beta back to an older build, for example when an older run is re-run.
+# - Every action is pinned to a full commit SHA.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    # GitHub does not apply the paths below to tags: every release tag builds.
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+    paths:
+      - Plamonic/**
+      - Plamonic.xcodeproj/**
+      - Packages/PlamoKit/Package.swift
+      - Packages/PlamoKit/Package.resolved
+      - Packages/PlamoKit/Sources/**
+      - project.yml
+      - Config/**
+      - LICENSE
+      - LICENSES/**
+      - THIRD_PARTY_NOTICES.md
+      - scripts/**
+      - .github/workflows/release.yml
+  # From the Actions tab, on main (a beta) or on a release tag (that release), to build again.
+  workflow_dispatch:
+
+permissions: {}
+
+# One run at a time per ref, in push order: a newer push replaces a run that is still waiting, and a run that has
+# started is never cancelled, so that a notarization or a publication is never left half done.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The Xcode that Plamonic builds with, on the runner image xcode-27 (scripts/select-xcode.sh).
+  XCODE: /Applications/Xcode_27.0.app
+  TEAM_ID: NBDP5VK335
+  ENVIRONMENT: ${{ github.ref_type == 'tag' && 'production' || 'beta' }}
+  # The release that holds the files, and their names: Plamonic.dmg and Plamonic.zip, or Plamonic-Beta.dmg and
+  # Plamonic-Beta.zip. The app is always Plamonic.app.
+  TAG: ${{ github.ref_type == 'tag' && github.ref_name || 'beta' }}
+  NAME: ${{ github.ref_type == 'tag' && 'Plamonic' || 'Plamonic-Beta' }}
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
+    steps:
+      # The whole history: the version counts commits.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check the ref
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == tag ]]; then
+            if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+              echo "::error::${GITHUB_REF_NAME} is not a commit of main: a release is built only from main."
+              exit 1
+            fi
+          elif [[ "${GITHUB_REF}" != refs/heads/main ]]; then
+            echo "::error::A beta is built only from main."
+            exit 1
+          fi
+
+      - name: Compute the version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == tag ]]; then
+            scripts/version.sh release "${GITHUB_REF_NAME}" | tee -a "${GITHUB_OUTPUT}"
+          else
+            scripts/version.sh beta | tee -a "${GITHUB_OUTPUT}"
+          fi
+
+  build:
+    name: Build
+    needs: version
+    runs-on: xcode-27
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      BUILD: ${{ needs.version.outputs.build }}
+      # The public half of the update key, which the app checks updates with (SUPublicEDKey).
+      SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the update key
+        run: |
+          if [[ ! "${SPARKLE_PUBLIC_KEY}" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+            echo "::error::Set the repository variable SPARKLE_PUBLIC_KEY to the public key of the update key (docs/DEVELOPMENT.md, \"Updates\")."
+            exit 1
+          fi
+
+      - name: Select Xcode
+        run: scripts/select-xcode.sh "${XCODE}" --metal
+
+      # Not signed: the sign job signs it. Apple silicon only: ARCHS also keeps the packages from compiling for Intel.
+      - name: Build the app
+        run: |
+          xcodebuild -project Plamonic.xcodeproj -scheme Plamonic -configuration Release \
+            -destination 'generic/platform=macOS' -derivedDataPath "${RUNNER_TEMP}/dd" \
+            -onlyUsePackageVersionsFromResolvedFile ARCHS=arm64 \
+            MARKETING_VERSION="${VERSION}" CURRENT_PROJECT_VERSION="${BUILD}" \
+            PLAMONIC_SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY}" \
+            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO build
+
+      # ditto keeps the frameworks' symbolic links, which an artifact alone would not.
+      - name: Check and pack the app
+        run: |
+          app="${RUNNER_TEMP}/dd/Build/Products/Release/Plamonic.app"
+          expect() {
+            local value
+            value="$(/usr/libexec/PlistBuddy -c "Print :$1" "${app}/Contents/Info.plist" 2>/dev/null || true)"
+            if [[ "${value}" != "$2" ]]; then
+              echo "::error::$1 of the app is '${value}', not '$2'."
+              exit 1
+            fi
+          }
+          expect CFBundleIdentifier io.smdr.Plamonic
+          expect CFBundleShortVersionString "${VERSION}"
+          expect CFBundleVersion "${BUILD}"
+          expect SUPublicEDKey "${SPARKLE_PUBLIC_KEY}"
+          if [[ ! -d "${app}/Contents/Frameworks/Sparkle.framework" ]]; then
+            echo "::error::The app does not embed Sparkle.framework."
+            exit 1
+          fi
+          echo "Architectures: $(lipo -archs "${app}/Contents/MacOS/Plamonic")"
+          ditto -c -k --sequesterRsrc --keepParent "${app}" "${RUNNER_TEMP}/Plamonic.app.zip"
+
+      # Kept as long as the signed files, so that a sign job that waits for approval or is re-run later still finds it.
+      - name: Upload the app
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: plamonic-unsigned
+          path: ${{ runner.temp }}/Plamonic.app.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  sign:
+    name: Sign and notarize
+    needs: [version, build]
+    runs-on: xcode-27
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    environment:
+      name: ${{ github.ref_type == 'tag' && 'production' || 'beta' }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      BUILD: ${{ needs.version.outputs.build }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the secrets
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          missing=()
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_KEY \
+            APPLE_API_ISSUER APPLE_API_PRIVATE_KEY SPARKLE_PRIVATE_KEY; do
+            [[ -n "${!name}" ]] || missing+=("${name}")
+          done
+          if ((${#missing[@]})); then
+            echo "::error::Set ${missing[*]} as secrets of the ${ENVIRONMENT} environment (docs/DEVELOPMENT.md, \"Signing the macOS app\" and \"Updates\")."
+            exit 1
+          fi
+
+      - name: Select Xcode
+        run: scripts/select-xcode.sh "${XCODE}"
+
+      # By id, so that only the app that this run's build job uploaded is signed.
+      - name: Download the app
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: ${{ runner.temp }}/unsigned
+
+      - name: Unpack the app
+        run: ditto -x -k "${RUNNER_TEMP}/unsigned/Plamonic.app.zip" "${RUNNER_TEMP}/app"
+
+      # SwiftPM fetches Sparkle alone, at the revision of the app's Package.resolved, and checks its archive.
+      - name: Get Sparkle's tools
+        run: |
+          bin="$(scripts/sparkle-tools.sh "${RUNNER_TEMP}/sparkle")"
+          echo "SPARKLE_BIN=${bin}" >>"${GITHUB_ENV}"
+
+      # The certificate goes into a keychain of its own, and the API key into a directory that only this step uses;
+      # both are deleted at its end. The app is notarized and stapled before it is packed, so that the update archive
+      # and the disk image hold the stapled app; the disk image is then notarized and stapled too.
+      - name: Sign, notarize and pack
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          app="${RUNNER_TEMP}/app/Plamonic.app"
+          work="${RUNNER_TEMP}/work"
+          private="$(mktemp -d)"
+          keychain="${private}/signing.keychain-db"
+          trap 'security delete-keychain "${keychain}" 2>/dev/null || true; rm -rf "${private}"' EXIT
+          mkdir -p "${work}" dist
+
+          password="$(uuidgen)"
+          security create-keychain -p "${password}" "${keychain}"
+          # The keychain never locks itself: notarizing the app can take a while before the disk image is signed.
+          security set-keychain-settings "${keychain}"
+          security unlock-keychain -p "${password}" "${keychain}"
+          (
+            umask 077
+            base64 --decode <<<"${APPLE_CERTIFICATE}" >"${private}/certificate.p12"
+            printf '%s\n' "${APPLE_API_PRIVATE_KEY}" >"${private}/AuthKey_${APPLE_API_KEY}.p8"
+          )
+          security import "${private}/certificate.p12" -k "${keychain}" -f pkcs12 \
+            -P "${APPLE_CERTIFICATE_PASSWORD}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${password}" "${keychain}" >/dev/null
+          security list-keychains -d user -s "${keychain}" login.keychain-db
+
+          notarize() {
+            local result
+            result="$(xcrun notarytool submit "$1" --wait --timeout 1h --output-format json \
+              --key "${private}/AuthKey_${APPLE_API_KEY}.p8" --key-id "${APPLE_API_KEY}" \
+              --issuer "${APPLE_API_ISSUER}")" || true
+            echo "${result}"
+            if [[ "$(jq -r '.status // empty' <<<"${result}")" != Accepted ]]; then
+              xcrun notarytool log "$(jq -r '.id // empty' <<<"${result}")" \
+                --key "${private}/AuthKey_${APPLE_API_KEY}.p8" --key-id "${APPLE_API_KEY}" \
+                --issuer "${APPLE_API_ISSUER}" || true
+              echo "::error::Apple did not notarize $(basename "$1")."
+              exit 1
+            fi
+          }
+
+          scripts/sign-app.sh "${app}" "${APPLE_SIGNING_IDENTITY}" Plamonic/Resources/Plamonic.entitlements \
+            "${keychain}"
+          ditto -c -k --keepParent "${app}" "${work}/notarize.zip"
+          notarize "${work}/notarize.zip"
+          xcrun stapler staple "${app}"
+
+          # The update archive, signed with the update key; the installed apps check it with SUPublicEDKey.
+          ditto -c -k --sequesterRsrc --keepParent "${app}" "dist/${NAME}.zip"
+          signature="$(printf '%s' "${SPARKLE_PRIVATE_KEY}" |
+            "${SPARKLE_BIN}/sign_update" --ed-key-file - -p "dist/${NAME}.zip")"
+          public_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "${app}/Contents/Info.plist")"
+          if ! xcrun swift scripts/verify-update.swift "${public_key}" "dist/${NAME}.zip" "${signature}"; then
+            echo "::error::SPARKLE_PRIVATE_KEY of the ${ENVIRONMENT} environment is not the private half of the repository variable SPARKLE_PUBLIC_KEY (docs/DEVELOPMENT.md, \"Updates\")."
+            exit 1
+          fi
+          printf '%s\n' "${signature}" >"${RUNNER_TEMP}/signature"
+
+          # The disk image for the first install: the app and a link to /Applications.
+          mkdir "${work}/dmg"
+          ditto "${app}" "${work}/dmg/Plamonic.app"
+          ln -s /Applications "${work}/dmg/Applications"
+          for attempt in 1 2 3; do
+            hdiutil create -volname Plamonic -srcfolder "${work}/dmg" -fs HFS+ -format UDZO -ov "dist/${NAME}.dmg" &&
+              break
+            ((attempt < 3)) || exit 1
+            sleep 15
+          done
+          codesign --force --sign "${APPLE_SIGNING_IDENTITY}" --timestamp --keychain "${keychain}" "dist/${NAME}.dmg"
+          notarize "dist/${NAME}.dmg"
+          xcrun stapler staple "dist/${NAME}.dmg"
+
+      # What Gatekeeper checks when someone opens the download, and that the update archive holds the same app,
+      # signed and stapled.
+      - name: Check the app
+        run: |
+          app="${RUNNER_TEMP}/app/Plamonic.app"
+          codesign --verify --deep --strict --verbose=2 "${app}"
+          team="$(codesign --display --verbose=2 "${app}" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+          if [[ "${team}" != "${TEAM_ID}" ]]; then
+            echo "::error::The app is signed by the team '${team}', not ${TEAM_ID}."
+            exit 1
+          fi
+          spctl --assess --type execute --verbose=2 "${app}"
+          xcrun stapler validate "${app}"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "dist/${NAME}.dmg"
+          xcrun stapler validate "dist/${NAME}.dmg"
+          unpacked="$(mktemp -d)"
+          ditto -x -k "dist/${NAME}.zip" "${unpacked}"
+          codesign --verify --deep --strict --verbose=2 "${unpacked}/Plamonic.app"
+          xcrun stapler validate "${unpacked}/Plamonic.app"
+
+      - name: Write the feed item
+        run: |
+          app="${RUNNER_TEMP}/app/Plamonic.app"
+          if [[ "${GITHUB_REF_TYPE}" == tag ]]; then
+            notes="<p><a href=\"https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}\">Plamonic ${VERSION} の変更点</a></p>"
+          else
+            notes="<p>main の <a href=\"https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}\">${GITHUB_SHA:0:7}</a> からビルドしたベータ版です。</p>"
+          fi
+          scripts/appcast.sh item --version "${VERSION}" --build "${BUILD}" \
+            --url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${NAME}.zip" \
+            --length "$(stat -f %z "dist/${NAME}.zip")" --signature "$(cat "${RUNNER_TEMP}/signature")" \
+            --minimum-system "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${app}/Contents/Info.plist")" \
+            --notes "${notes}" >dist/appcast-item.xml
+          cat dist/appcast-item.xml
+          ls -l dist
+
+      - name: Upload the files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: plamonic-signed
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish
+    needs: [version, sign]
+    runs-on: macos-26
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.version.outputs.version }}
+      BUILD: ${{ needs.version.outputs.build }}
+    steps:
+      # Only for scripts/appcast.sh.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/appcast.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Download the files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: plamonic-signed
+          path: dist
+
+      # A release's feed lists that release. A beta's feed lists the beta and the latest release, if there is one. The
+      # item stays in RUNNER_TEMP for the beta feed, which "Publish the release" rewrites.
+      - name: Write the feed
+        run: |
+          item="${RUNNER_TEMP}/item.xml"
+          mv dist/appcast-item.xml "${item}"
+          mkdir feed
+          if [[ "${GITHUB_REF_TYPE}" == tag ]]; then
+            scripts/appcast.sh feed "Plamonic" "${item}" >feed/appcast.xml
+          else
+            items=("${item}")
+            latest="$(gh api "repos/${GH_REPO}/releases/latest" --jq .tag_name 2>/dev/null || true)"
+            if [[ -n "${latest}" ]]; then
+              if gh release download "${latest}" --pattern appcast.xml --dir "${RUNNER_TEMP}/release"; then
+                scripts/appcast.sh items "${RUNNER_TEMP}/release/appcast.xml" release >"${RUNNER_TEMP}/release-item.xml"
+                items+=("${RUNNER_TEMP}/release-item.xml")
+              else
+                echo "::warning::The latest release ${latest} has no appcast.xml: the beta feed lists the beta alone."
+              fi
+            fi
+            scripts/appcast.sh feed "Plamonic (beta)" "${items[@]}" >feed/appcast.xml
+          fi
+          cat feed/appcast.xml
+          ls -l dist
+
+      # The release keeps its place: the files are replaced, the tag moved and the text changed in place, which
+      # notifies nobody. The first run creates it. A run whose build is older than the published beta's publishes
+      # nothing: a re-run of a run that failed before a newer beta came out would otherwise take the beta back.
+      - name: Publish the beta
+        if: github.ref_type != 'tag'
+        run: |
+          title="Plamonic ${VERSION}"
+          notes="Plamonic ${VERSION}, a beta built from ${GITHUB_SHA} on main. It is replaced with every push to main"
+          notes+=" that changes the app. Installed copies update to it when ベータ版を受け取る is on in the settings"
+          notes+=" (一般). Not a release: download a release from https://github.com/${GH_REPO}/releases/latest."
+          if gh release view beta >/dev/null 2>&1; then
+            published=""
+            if gh release download beta --pattern appcast.xml --dir "${RUNNER_TEMP}/published"; then
+              published="$(scripts/appcast.sh build "${RUNNER_TEMP}/published/appcast.xml" beta || true)"
+            fi
+            if [[ -n "${published}" ]] && ((published > BUILD)); then
+              echo "::notice::The prerelease beta already has build ${published}, newer than this run's ${BUILD}: nothing is published."
+              exit 0
+            fi
+            gh release upload beta dist/* --clobber
+            gh release upload beta feed/appcast.xml --clobber
+            gh api --method PATCH "repos/${GH_REPO}/git/refs/tags/beta" -f sha="${GITHUB_SHA}" -F force=true >/dev/null
+            gh release edit beta --prerelease --latest=false --title "${title}" --notes "${notes}"
+          else
+            gh release create beta dist/* feed/appcast.xml --target "${GITHUB_SHA}" --prerelease --latest=false \
+              --title "${title}" --notes "${notes}"
+          fi
+
+      # gh publishes a new release once its files are uploaded, so the latest release's feed never names a missing
+      # file. The notes start at the previous release, not at the prerelease "beta".
+      #
+      # Last, the beta feed gets this release next to its beta. It is read only now, right before it is written, so
+      # that a beta published in the meantime keeps its feed. It also stays as it is while a beta is being published
+      # (the beta's archive is not the one that the feed signs) and when it already lists a newer release.
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        run: |
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/* --clobber
+            gh release upload "${TAG}" feed/appcast.xml --clobber
+          else
+            previous="$(gh api "repos/${GH_REPO}/releases/latest" --jq .tag_name 2>/dev/null || true)"
+            start=()
+            if [[ -n "${previous}" ]]; then
+              start=(--notes-start-tag "${previous}")
+            fi
+            gh release create "${TAG}" dist/* feed/appcast.xml --verify-tag --title "Plamonic ${VERSION}" \
+              --generate-notes "${start[@]}"
+          fi
+          if gh release view beta >/dev/null 2>&1; then
+            beta="${RUNNER_TEMP}/beta"
+            if gh release download beta --pattern appcast.xml --dir "${beta}"; then
+              length="$(scripts/appcast.sh length "${beta}/appcast.xml" beta)"
+              size="$(gh release view beta --json assets --jq '.assets[] | select(.name == "Plamonic-Beta.zip") | .size')"
+              listed="$(scripts/appcast.sh build "${beta}/appcast.xml" release)"
+              if [[ -n "${length}" && "${length}" != "${size}" ]]; then
+                echo "::warning::Plamonic-Beta.zip is not the archive that the beta feed signs, so a beta is being published: its feed stays as it is."
+              elif [[ -n "${listed}" ]] && ((listed > BUILD)); then
+                echo "::notice::The beta feed already lists a newer release, build ${listed}: it stays as it is."
+              else
+                scripts/appcast.sh items "${beta}/appcast.xml" beta >"${RUNNER_TEMP}/beta-item.xml"
+                mkdir beta-feed
+                scripts/appcast.sh feed "Plamonic (beta)" "${RUNNER_TEMP}/beta-item.xml" "${RUNNER_TEMP}/item.xml" \
+                  >beta-feed/appcast.xml
+                cat beta-feed/appcast.xml
+                gh release upload beta beta-feed/appcast.xml --clobber
+              fi
+            else
+              echo "::warning::The prerelease beta has no appcast.xml: its feed stays as it is."
+            fi
+          fi

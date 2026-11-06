@@ -1,0 +1,629 @@
+{
+ "cases": [
+  {
+   "kwargs": {
+    "target_lang": "ja"
+   },
+   "messages": [
+    {
+     "role": "user",
+     "content": "The meeting has been moved to next Monday."
+    }
+   ],
+   "prompt": "<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input<|plamo:msg|>The meeting has been moved to next Monday.<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>ja<|plamo:msg|>",
+   "prompt_ids": [
+    1,
+    16,
+    48472,
+    19,
+    22125,
+    16,
+    2225,
+    19,
+    1100,
+    3560,
+    1330,
+    13064,
+    1920,
+    6418,
+    46,
+    16,
+    4160,
+    17,
+    1943,
+    18,
+    1385,
+    19
+   ],
+   "output": "会議は来週の月曜日に変更になりました。",
+   "top5": [
+    52499,
+    70069,
+    57353,
+    60031,
+    100518
+   ],
+   "top5_logits": [
+    31.75,
+    24.375,
+    23.625,
+    21.25,
+    19.625
+   ]
+  },
+  {
+   "kwargs": {
+    "target_lang": "en"
+   },
+   "messages": [
+    {
+     "role": "user",
+     "content": "会議は来週の月曜日に変更されました。"
+    }
+   ],
+   "prompt": "<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input<|plamo:msg|>会議は来週の月曜日に変更されました。<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>",
+   "prompt_ids": [
+    1,
+    16,
+    48472,
+    19,
+    22125,
+    16,
+    2225,
+    19,
+    52499,
+    50104,
+    56665,
+    50100,
+    54179,
+    53785,
+    50715,
+    16,
+    4160,
+    17,
+    1943,
+    18,
+    1109,
+    19
+   ],
+   "output": "The meeting has been rescheduled for next Monday.",
+   "top5": [
+    1100,
+    31980,
+    38439,
+    17089,
+    38870
+   ],
+   "top5_logits": [
+    46.0,
+    27.375,
+    26.875,
+    26.625,
+    24.875
+   ]
+  },
+  {
+   "kwargs": {
+    "target_lang": "ja",
+    "form": "polite"
+   },
+   "messages": [
+    {
+     "role": "user",
+     "content": "This system is convenient."
+    }
+   ],
+   "prompt": "<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input<|plamo:msg|>This system is convenient.<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>ja<|plamo:key|>form<|plamo:val|>polite<|plamo:msg|>",
+   "prompt_ids": [
+    1,
+    16,
+    48472,
+    19,
+    22125,
+    16,
+    2225,
+    19,
+    1250,
+    1366,
+    48097,
+    9473,
+    46,
+    16,
+    4160,
+    17,
+    1943,
+    18,
+    1385,
+    17,
+    2105,
+    18,
+    44246,
+    19
+   ],
+   "output": "このシステムは便利です。",
+   "top5": [
+    50137,
+    71790,
+    61680,
+    100035,
+    60391
+   ],
+   "top5_logits": [
+    39.5,
+    21.75,
+    20.625,
+    20.125,
+    19.625
+   ]
+  },
+  {
+   "kwargs": {
+    "target_lang": "ja",
+    "context": "Slack conversation between software engineers."
+   },
+   "messages": [
+    {
+     "role": "user",
+     "content": "Hey @channel, the deploy is blocked until QA signs off 🚀\nPlease check   the dashboard!!!!"
+    }
+   ],
+   "prompt": "<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>context<|plamo:msg|>Slack conversation between software engineers.<|plamo:tag|>input<|plamo:msg|>Hey @channel, the deploy is blocked until QA signs off 🚀\nPlease check   the dashboard!!!!<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>ja<|plamo:msg|>",
+   "prompt_ids": [
+    1,
+    16,
+    48472,
+    19,
+    22125,
+    16,
+    3407,
+    19,
+    66458,
+    9190,
+    1368,
+    1726,
+    20143,
+    46,
+    16,
+    2225,
+    19,
+    10218,
+    320,
+    7922,
+    50125,
+    19012,
+    48097,
+    19786,
+    2014,
+    32,
+    61070,
+    10063,
+    1322,
+    32,
+    240,
+    159,
+    154,
+    128,
+    10,
+    3549,
+    1837,
+    524,
+    1195,
+    24655,
+    10817,
+    16,
+    4160,
+    17,
+    1943,
+    18,
+    1385,
+    19
+   ],
+   "output": "@channel さん、QAの承認が出るまでデプロイがブロックされています🚀\nダッシュボードを確認してください！！！！",
+   "top5": [
+    64,
+    62868,
+    50112,
+    54847,
+    50587
+   ],
+   "top5_logits": [
+    20.75,
+    18.375,
+    16.125,
+    15.0625,
+    14.5625
+   ]
+  },
+  {
+   "kwargs": {
+    "source_lang": "ja",
+    "target_lang": "en",
+    "glossary": [
+     {
+      "source": "オーナー",
+      "target": "assignee"
+     }
+    ]
+   },
+   "messages": [
+    {
+     "role": "user",
+     "content": "プロジェクトの管理画面を開きます。"
+    },
+    {
+     "role": "assistant",
+     "content": "Open the project dashboard."
+    },
+    {
+     "role": "user",
+     "content": "オーナーでフィルタリングすることもできます。"
+    }
+   ],
+   "prompt": "<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input<|plamo:key|>lang<|plamo:val|>ja<|plamo:msg|>プロジェクトの管理画面を開きます。<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>Open the project dashboard.<|plamo:tag|>glossary<|plamo:index|>オーナー<|plamo:item|>assignee<|plamo:tag|>input<|plamo:key|>lang<|plamo:val|>ja<|plamo:msg|>オーナーでフィルタリングすることもできます。<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>",
+   "prompt_ids": [
+    1,
+    16,
+    48472,
+    19,
+    22125,
+    16,
+    2225,
+    17,
+    1943,
+    18,
+    1385,
+    19,
+    51408,
+    50100,
+    72211,
+    59643,
+    50134,
+    16,
+    4160,
+    17,
+    1943,
+    18,
+    1109,
+    19,
+    3879,
+    1087,
+    1803,
+    24655,
+    46,
+    16,
+    44714,
+    1673,
+    20,
+    54071,
+    21,
+    12852,
+    1947,
+    16,
+    2225,
+    17,
+    1943,
+    18,
+    1385,
+    19,
+    54071,
+    50107,
+    82681,
+    51167,
+    61677,
+    16,
+    4160,
+    17,
+    1943,
+    18,
+    1109,
+    19
+   ],
+   "output": "You can also filter by assignee.",
+   "top5": [
+    23796,
+    4067,
+    14438,
+    2181,
+    8938
+   ],
+   "top5_logits": [
+    42.25,
+    30.0,
+    27.875,
+    25.0,
+    23.5
+   ]
+  },
+  {
+   "kwargs": {
+    "target_lang": "ja(easy)"
+   },
+   "messages": [
+    {
+     "role": "user",
+     "content": "今日はとても暑いですね。熱中症に気をつけてください。"
+    }
+   ],
+   "prompt": "<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input<|plamo:msg|>今日はとても暑いですね。熱中症に気をつけてください。<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>ja(easy)<|plamo:msg|>",
+   "prompt_ids": [
+    1,
+    16,
+    48472,
+    19,
+    22125,
+    16,
+    2225,
+    19,
+    51077,
+    52101,
+    55322,
+    50282,
+    65205,
+    77819,
+    50166,
+    16,
+    4160,
+    17,
+    1943,
+    18,
+    1385,
+    40,
+    16201,
+    41,
+    19
+   ],
+   "output": "今日はとても暑いですね。熱中症に気をつけてください。",
+   "top5": [
+    51077,
+    50672,
+    58449,
+    1781,
+    50651
+   ],
+   "top5_logits": [
+    33.75,
+    26.375,
+    22.125,
+    19.875,
+    19.75
+   ]
+  },
+  {
+   "kwargs": {
+    "target_lang": "ja"
+   },
+   "messages": [
+    {
+     "role": "user",
+     "content": "Le chat est sur la table. 我们明天见。"
+    }
+   ],
+   "prompt": "<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input<|plamo:msg|>Le chat est sur la table. 我们明天见。<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>ja<|plamo:msg|>",
+   "prompt_ids": [
+    1,
+    16,
+    48472,
+    19,
+    22125,
+    16,
+    2225,
+    19,
+    2576,
+    4608,
+    102752,
+    2384,
+    1164,
+    2024,
+    1059,
+    100026,
+    50767,
+    50542,
+    100074,
+    50102,
+    16,
+    4160,
+    17,
+    1943,
+    18,
+    1385,
+    19
+   ],
+   "output": "猫がテーブルの上にいる。明日会おう。",
+   "top5": [
+    74091,
+    51778,
+    56830,
+    52154,
+    59104
+   ],
+   "top5_logits": [
+    24.75,
+    22.25,
+    17.25,
+    14.125,
+    13.9375
+   ]
+  }
+ ],
+ "tokenizer": [
+  {
+   "text": "Hello, world!",
+   "ids": [
+    7272,
+    44,
+    1675,
+    33
+   ],
+   "decoded": "Hello, world!"
+  },
+  {
+   "text": "こんにちは世界",
+   "ids": [
+    54847,
+    50358
+   ],
+   "decoded": "こんにちは世界"
+  },
+  {
+   "text": "   leading spaces",
+   "ids": [
+    524,
+    21763,
+    5983
+   ],
+   "decoded": "   leading spaces"
+  },
+  {
+   "text": "aaaaaaaa bbbb",
+   "ids": [
+    45763,
+    97,
+    32,
+    49656,
+    98
+   ],
+   "decoded": "aaaaaaaa bbbb"
+  },
+  {
+   "text": "emoji 🚀🎉 and ünïcödé",
+   "ids": [
+    1255,
+    9501,
+    32,
+    240,
+    159,
+    154,
+    128,
+    595,
+    1561,
+    1213,
+    110,
+    6105,
+    99,
+    1190,
+    5918
+   ],
+   "decoded": "emoji 🚀🎉 and ünïcödé"
+  },
+  {
+   "text": "<|plamo:tag|>input<|plamo:msg|>x",
+   "ids": [
+    16,
+    2225,
+    19,
+    120
+   ],
+   "decoded": "<|plamo:tag|>input<|plamo:msg|>x"
+  },
+  {
+   "text": "tab\tnew\nline",
+   "ids": [
+    3527,
+    9,
+    1327,
+    10,
+    1425
+   ],
+   "decoded": "tab\tnew\nline"
+  },
+  {
+   "text": "混在 mixed テキスト 123,456.78",
+   "ids": [
+    54278,
+    50455,
+    6394,
+    32,
+    53385,
+    305,
+    50,
+    51,
+    552,
+    53,
+    54,
+    565,
+    56
+   ],
+   "decoded": "混在 mixed テキスト 123,456.78"
+  },
+  {
+   "text": "",
+   "ids": [],
+   "decoded": ""
+  },
+  {
+   "text": "",
+   "ids": [],
+   "decoded": ""
+  },
+  {
+   "text": "ｶﾀｶﾅ全角ＡＢＣ",
+   "ids": [
+    64355,
+    61835,
+    64355,
+    78886,
+    95201,
+    50038,
+    50039,
+    50040
+   ],
+   "decoded": "ｶﾀｶﾅ全角ＡＢＣ"
+  },
+  {
+   "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "ids": [
+    44830,
+    44830,
+    44830,
+    44830,
+    44830,
+    44830,
+    44830,
+    44830,
+    7062
+   ],
+   "decoded": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "text": "Ｈｅｌｌｏ　　ｗｏｒｌｄ",
+   "ids": [
+    50045,
+    50074,
+    50081,
+    50081,
+    50084,
+    56241,
+    56241,
+    50092,
+    50084,
+    50087,
+    50081,
+    50073
+   ],
+   "decoded": "Ｈｅｌｌｏ　　ｗｏｒｌｄ"
+  },
+  {
+   "text": "🇯🇵👨‍👩‍👧",
+   "ids": [
+    987,
+    958,
+    240,
+    159,
+    145,
+    168,
+    226,
+    128,
+    141,
+    657,
+    226,
+    128,
+    141,
+    240,
+    159,
+    145,
+    167
+   ],
+   "decoded": "🇯🇵👨‍👩‍👧"
+  }
+ ]
+}

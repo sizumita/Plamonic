@@ -1,0 +1,133 @@
+# Checks every pull request and every push to main: the workflows and scripts, the release scripts' tests, that
+# Plamonic.xcodeproj is what XcodeGen makes from project.yml, the app's unit tests and PlamoKit's tests. PlamoKit's
+# tests that need a downloaded model skip.
+#
+# - No job has secrets, and the GITHUB_TOKEN can only read the repository.
+# - The macOS jobs run on the runner image with Xcode 27 and use the Xcode that XCODE names (scripts/select-xcode.sh).
+# - Tools come from their official releases, checked against the SHA-256 below. Every action is pinned to a full
+#   commit SHA.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+# A newer push to a pull request cancels the run that is still checking the previous one.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  XCODE: /Applications/Xcode_27.0.app
+
+jobs:
+  lint:
+    name: Lint the workflows and scripts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install actionlint
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "${RUNNER_TEMP}/${archive}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" actionlint
+
+      # actionlint also runs ShellCheck, which the runner image has, on the scripts of the steps.
+      - name: Lint the workflows
+        run: |
+          "${RUNNER_TEMP}/actionlint" -color
+
+      - name: Lint the scripts
+        run: shellcheck scripts/*.sh
+
+  app:
+    name: Build and test the app
+    runs-on: xcode-27
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      XCODEGEN_VERSION: 2.46.0
+      XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: scripts/select-xcode.sh "${XCODE}" --metal
+
+      - name: Test the release scripts
+        run: scripts/test.sh
+
+      - name: Install XcodeGen
+        run: |
+          curl -fsSL -o "${RUNNER_TEMP}/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          echo "${XCODEGEN_SHA256}  ${RUNNER_TEMP}/xcodegen.zip" | shasum -a 256 --check --strict
+          unzip -q "${RUNNER_TEMP}/xcodegen.zip" -d "${RUNNER_TEMP}"
+
+      # XcodeGen also writes Info.plist and the entitlements from project.yml.
+      - name: Check the Xcode project
+        run: |
+          "${RUNNER_TEMP}/xcodegen/bin/xcodegen" generate
+          if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+            git status --short --untracked-files=all
+            git diff --stat
+            echo "::error::Plamonic.xcodeproj is not what project.yml makes. Run xcodegen generate (XcodeGen ${XCODEGEN_VERSION}) and commit the result."
+            exit 1
+          fi
+
+      # Signed ad hoc (Config/Signing.xcconfig), with the package versions of Package.resolved.
+      # A test that fails once is run once more: the runner is slower than a Mac, and some tests wait on timers.
+      - name: Build and run the unit tests
+        run: |
+          xcodebuild -project Plamonic.xcodeproj -scheme Plamonic -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' -derivedDataPath "${RUNNER_TEMP}/dd" \
+            -onlyUsePackageVersionsFromResolvedFile -retry-tests-on-failure -test-iterations 2 \
+            COMPILER_INDEX_STORE_ENABLE=NO test
+
+  plamokit:
+    name: Test PlamoKit
+    runs-on: xcode-27
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: scripts/select-xcode.sh "${XCODE}" --metal
+
+      # xcodebuild, not swift test: SwiftPM alone cannot compile MLX's Metal shaders.
+      - name: Build and run the tests
+        working-directory: Packages/PlamoKit
+        run: |
+          xcodebuild -scheme PlamoKit-Package -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "${RUNNER_TEMP}/dd" -onlyUsePackageVersionsFromResolvedFile \
+            COMPILER_INDEX_STORE_ENABLE=NO test
