@@ -1,18 +1,116 @@
+<div align="center">
+
 # Plamonic
+
+**Read any Mac app in your language, right where it is.**
+
+Plamonic is a menu bar app that draws translations over the text of other apps, so they read as if they had been
+written in your language.<br>
+Translation runs on your Mac with PLaMo 3 Translate, so the text never leaves it.
+
+[![Download](https://img.shields.io/badge/Download-Plamonic.dmg-2ea44f?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sizumita/Plamonic/releases/latest)
+
+![macOS 15+](https://img.shields.io/badge/macOS-15%2B-blue?style=flat-square)
+![Apple silicon](https://img.shields.io/badge/Apple%20silicon-M1%2B-555?style=flat-square)
+![On-device](https://img.shields.io/badge/translation-on--device-8A2BE2?style=flat-square)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square)](LICENSE)
 
 [日本語](README.md) | English
 
-Plamonic is a macOS menu bar app that translates other apps in place. It reads the text an app shows and draws the
-translation over the original, in the original's size, line spacing and colour, so the app reads as if it were written
-in your language. Clicks still go to the app, links in a translation work, and holding ⌥ shows the original.
+<!-- Once docs/images/demo.gif exists, uncomment the next line -->
+<!-- <img src="docs/images/demo.gif" width="820" alt="English messages in Slack turning into Japanese in place"> -->
 
-Translation runs on your Mac with Preferred Networks' PLaMo 3 Translate models. The app's interface is in Japanese.
+</div>
+
+> [!NOTE]
+> The app's interface is in Japanese. Translations can go into 53 languages.
+
+## What it does
+
+### Blends into the app
+
+Each translation is drawn where the original is, in the original's font size, line spacing and colour. Plamonic
+measures the background and text colours from the window itself, so there is no box or shadow: the translation looks
+like the app's own text. When a translation is longer than the original, it uses the free space below and then shrinks
+slightly to fit. It never covers other paragraphs, names, timestamps, buttons or code.
+
+### Works like the app
+
+The translation is only drawn on top, so clicks and scrolling still go to the app. Links inside a translation work,
+and right-clicking one opens the app's own menu, such as Copy Link Address.
+
+### The original is one key away
+
+Hold ⌥ (Option) to see the original. Rest the pointer on a translation to see its original in a tooltip.
+
+### Keeps up while you read
+
+New text is first translated by a small model (0.8B), so a draft appears at once, and then refined from the top by a
+larger model (2B). When a lot of text arrives at once, from scrolling or a burst of messages, Plamonic puts drafts
+first and refines later. Translations are cached, so text you have seen before appears instantly.
+
+### Stays on your Mac
+
+Plamonic reads text from apps through the macOS Accessibility API, not from screenshots or OCR. The models run on
+your Mac with [MLX](https://github.com/ml-explore/mlx-swift), so nothing you read is sent anywhere. While you type a
+password, Plamonic reads nothing.
+
+### Knows what to translate in each app
+
+In Slack and Discord it translates message text only; in a terminal, the output without borders and prompts. You can
+also translate the whole window, just the paragraph under the pointer, or just the selected text.
+
+### And more
+
+- 53 target languages, plus easy Japanese (やさしい日本語), in plain or polite style.
+- A glossary for names and terms you want translated your way.
+- Per-app modes: automatic (translate whenever the screen changes), manual (translate on a hotkey) or off.
+- Updates are announced in the menu and install from there.
+
+## Supported apps
+
+| App | What is translated | Status |
+| --- | --- | --- |
+| Slack | Message text | Tested |
+| Discord | Message text and embed descriptions | Tested |
+| Claude (Claude Code tab) | Chat messages | Tested |
+| OpenCode (desktop) | Body paragraphs | Tested |
+| Terminal | Output, for example from the Claude Code, Codex and OpenCode CLIs | Tested |
+| iTerm2, Codex, DeepSeek Harness | Presets of the same kind | Not yet tested |
+
+Most other apps work too. They start in manual mode: press ⌃⌥R when you want a translation. To choose what gets
+translated, use 要素を調べる (inspect element) in 設定 › アプリ and point at the text.
+Ghostty does not tell macOS where its characters are, so Plamonic cannot translate it yet.
+
+## Getting started
+
+1. Download `Plamonic.dmg` from the [latest release](https://github.com/sizumita/Plamonic/releases/latest) and drag
+   Plamonic to Applications. Releases are signed with a Developer ID and notarized by Apple, so they open like any
+   other app.
+2. Open Plamonic. A speech bubble icon appears in the menu bar, not in the Dock.
+3. When it asks, allow Plamonic in System Settings › Privacy & Security › Accessibility. You do not need to restart it.
+4. Download the models (about 3.4 GB) from the same window. Translation starts as soon as they are ready.
+5. Optionally, click 画面収録を許可… (allow screen recording) so translations match the background more closely.
+
+| Action | Key |
+| --- | --- |
+| Turn translation on or off | ⌃⌥T |
+| Translate now | ⌃⌥R |
+| Show the original | Hold ⌥ |
+
+The [user guide](docs/USAGE.ja.md) (Japanese) explains every setting and what to do when something does not work.
+
+## Requirements
+
+- macOS 15 or later, on Apple silicon (M1 or later).
+- Memory: 8 GB for the 0.8B and 2B models, 16 GB for 8B, 48 GB for 31B.
+- Disk: about 3.4 GB for the default models (2B, with 0.8B for drafts).
 
 ## Privacy
 
 - Plamonic reads text through the macOS Accessibility API, not from screenshots or OCR.
-- The models run on your Mac with [MLX Swift](https://github.com/ml-explore/mlx-swift), so text never leaves it.
-  Plamonic uses the network only to download the models from Hugging Face and to check GitHub for updates.
+- It uses the network only to download the models from Hugging Face and to check GitHub for updates. The update check
+  sends nothing about you or your Mac.
 - Screen Recording permission is optional. With it, Plamonic measures the colours around the text so the translation
   blends in. The captured pixels are used for that alone, in memory, and are never saved or sent.
 - While you type a password (in a password field or a system password dialog), Plamonic reads nothing from other apps
@@ -20,30 +118,36 @@ Translation runs on your Mac with Preferred Networks' PLaMo 3 Translate models. 
 - Translations are cached in `~/Library/Application Support/Plamonic`, readable only by your account. The cache can be
   turned off.
 
-## Requirements
+## FAQ
 
-- macOS 15 or later, on Apple silicon (M1 or later).
-- Memory: 8 GB for the 0.8B and 2B models, 16 GB for 8B, 48 GB for 31B.
-- Disk: about 3.4 GB for the default models (2B, with 0.8B for quick drafts).
+<details>
+<summary><b>Is it free?</b></summary>
 
-## Download
+Plamonic is free and open source (AGPL-3.0). The PLaMo 3 Translate models are published by Preferred Networks under the
+[PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-en); read it before you use them.
+Commercial use requires registration with Preferred Networks.
 
-1. Download `Plamonic.dmg` from the [latest release](https://github.com/sizumita/Plamonic/releases/latest), open it
-   and drag Plamonic to Applications. Releases are signed with a Developer ID and notarized by Apple, so they open
-   like any other app.
-2. Open Plamonic. Its icon appears in the menu bar, not in the Dock.
-3. When it asks, allow Plamonic in System Settings › Privacy & Security › Accessibility. You do not need to restart it.
-4. Download the models from the same window. Translation starts once the download finishes. Preferred Networks
-   publishes the models under the
-   [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-en); read it before you use
-   them. Commercial use requires registration with Preferred Networks.
+</details>
 
-Plamonic checks for updates once a day and shows a new version in its menu, without opening a window. To also get the
-beta versions built from every change to `main`, turn on ベータ版を受け取る (receive beta versions) in 設定 › 一般 ›
-アップデート. A beta is the same app and keeps your settings and models.
+<details>
+<summary><b>Will it translate text that is already in my language?</b></summary>
 
-The [user guide](docs/USAGE.ja.md) (Japanese) explains every setting, the supported apps and what to do when
-something does not work.
+No. By default, text that is already in the target language is left as it is.
+
+</details>
+
+<details>
+<summary><b>How much memory does it use?</b></summary>
+
+The default 2B and 0.8B models run on an 8 GB Mac. Plamonic unloads them after 15 minutes without translating; you can
+change that in 設定 › 詳細.
+
+</details>
+
+## Beta versions
+
+To also get the beta versions built from every change to `main`, turn on ベータ版を受け取る (receive beta versions) in
+設定 › 一般 › アップデート. A beta is the same app and keeps your settings and models.
 
 ## Build from source
 
@@ -58,6 +162,9 @@ xcodebuild -project Plamonic.xcodeproj -scheme Plamonic -configuration Debug \
 open build/DD/Build/Products/Debug/Plamonic.app
 ```
 
+<details>
+<summary>If macOS forgets the Accessibility permission after every build</summary>
+
 The build is signed ad hoc, so macOS forgets its Accessibility permission each time you build again. If you have a
 development certificate, name it in `Config/Signing.local.xcconfig`, which is not committed, and the permission stays:
 
@@ -67,7 +174,9 @@ CODE_SIGN_IDENTITY = <certificate name or SHA-1>
 DEVELOPMENT_TEAM = <team ID>
 ```
 
-A build from source does not update itself.
+</details>
+
+A build from source does not update itself. [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) covers tests and releases.
 
 ## Documentation
 
