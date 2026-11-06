@@ -32,6 +32,7 @@
 		26631C2C2F07194D4F20149D /* PasswordEntryGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E1CA2EC83F2B0D6779B197D /* PasswordEntryGuard.swift */; };
 		2F98B38B21AB384336F1C900 /* SettingsSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E53B7371D6E5F1F499DE651 /* SettingsSnapshot.swift */; };
 		3032C38C445C829E29C23FC1 /* SettingsProgressiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E881581D3E7793F028296553 /* SettingsProgressiveTests.swift */; };
+		319FD2DBD023F86F27427FC9 /* PlamoLicenseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED53AEF141C2B276D21046BF /* PlamoLicenseView.swift */; };
 		320515F08F40F9301CB5F384 /* LinkReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 774AFA54FBAD7C8A5466BB2C /* LinkReader.swift */; };
 		330148E8F8EB0AB39B377D5F /* ModelSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617C3F3F18A3E9813BAD641B /* ModelSettingsPane.swift */; };
 		33924E40A1A1D703C9D16012 /* AccessibilityPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F3C9CE35C7286A232F95D9B /* AccessibilityPermission.swift */; };
@@ -291,6 +292,7 @@
 		E881581D3E7793F028296553 /* SettingsProgressiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsProgressiveTests.swift; sourceTree = "<group>"; };
 		EA557C0AB5D176BD79B42FC2 /* ModelLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelLibrary.swift; sourceTree = "<group>"; };
 		EC6ED3F90C1AD36DE42557ED /* SparkleUpdateEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleUpdateEngine.swift; sourceTree = "<group>"; };
+		ED53AEF141C2B276D21046BF /* PlamoLicenseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlamoLicenseView.swift; sourceTree = "<group>"; };
 		F561F47E3558F169012D89B2 /* MenuBarContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContent.swift; sourceTree = "<group>"; };
 		F7C80AA290842D05744A78D3 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		FB1BEEE0E04DC41B6B710547 /* UpdateControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateControllerTests.swift; sourceTree = "<group>"; };
@@ -494,6 +496,7 @@
 				90B38F4EB6C6EDA5E2CB4853 /* GlossarySettingsPane.swift */,
 				D678A429E419B0C9B0902C2E /* HotkeySettingsPane.swift */,
 				617C3F3F18A3E9813BAD641B /* ModelSettingsPane.swift */,
+				ED53AEF141C2B276D21046BF /* PlamoLicenseView.swift */,
 				7181924C05F7E1712AEF8D18 /* RulesEditor.swift */,
 				5BF54435292EE723201DC0BB /* SettingsComponents.swift */,
 				E50E527187C231470A73CDB5 /* SettingsLabels.swift */,
@@ -801,6 +804,7 @@
 				92DB6C703476FC293BAF2137 /* OverlayViews.swift in Sources */,
 				26631C2C2F07194D4F20149D /* PasswordEntryGuard.swift in Sources */,
 				F0FC5604DBDF6322698A8619 /* PlamoBackend.swift in Sources */,
+				319FD2DBD023F86F27427FC9 /* PlamoLicenseView.swift in Sources */,
 				3E0A574C4FD9BAB446F3A85D /* PlamonicApp.swift in Sources */,
 				9C4237166510167B6C32BBF1 /* ProgressiveStatus.swift in Sources */,
 				F93C1CBDEF43441BD53A91C2 /* RenderCheck.swift in Sources */,

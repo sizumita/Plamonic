@@ -62,7 +62,7 @@ struct OnboardingView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Link("PLaMo Community License", destination: ModelSettingsPane.licenseURL)
+                PlamoLicenseButton()
                     .font(.caption)
             }
 

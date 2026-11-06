@@ -5,8 +5,6 @@ struct ModelSettingsPane: View {
     @ObservedObject var models: ModelLibrary
     @State private var pendingDelete: ModelSize?
 
-    static let licenseURL = URL(string: "https://plamo.preferredai.jp/info/plamo-community-license")!
-
     var body: some View {
         Form {
             Section {
@@ -55,7 +53,7 @@ struct ModelSettingsPane: View {
             Section("ライセンス") {
                 Text("PLaMo 3 Translate のモデルは Preferred Networks が PLaMo Community License のもとで公開しています。ダウンロードして使う前にライセンスを確認してください。商用で利用する場合は Preferred Networks への登録が必要です。")
                     .fixedSize(horizontal: false, vertical: true)
-                Link("PLaMo Community License を読む", destination: Self.licenseURL)
+                PlamoLicenseButton()
                 Text("Built with PLaMo")
                     .foregroundStyle(.secondary)
             }
