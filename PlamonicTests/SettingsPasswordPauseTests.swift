@@ -92,9 +92,9 @@ final class SettingsPasswordPauseTests: XCTestCase {
         let text = GeneralSettingsPane.passwordPauseDescription
         XCTAssertTrue(text.contains("パスワード欄に入力しているとき"))
         XCTAssertTrue(text.contains("システムのパスワード画面"))
-        XCTAssertTrue(text.contains("ターミナルでは、パスワードを待っているウインドウ"))
+        XCTAssertTrue(text.contains("ターミナルではパスワードを待っているウインドウ"))
         XCTAssertTrue(text.contains("表示中の訳文はそのまま残ります。"))
-        XCTAssertTrue(text.contains("止めていることは、メニューバーのメニューに表示します"))
-        XCTAssertTrue(text.contains("パスワード欄の中身は、この設定に関係なく読み取りません"))
+        XCTAssertTrue(text.contains("止めていることはメニューバーのメニューに表示します"))
+        XCTAssertTrue(text.contains("パスワード欄の中身はこの設定に関係なく読み取りません"))
     }
 }

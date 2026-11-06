@@ -20,7 +20,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Plamonic へようこそ").font(.title2.bold())
-                    Text("ほかのアプリの文章を、その場で日本語などに翻訳して重ねて表示します。")
+                    Text("ほかのアプリの文章をその場で日本語などに翻訳して重ねて表示します。")
                         .foregroundStyle(.secondary)
                 }
             }

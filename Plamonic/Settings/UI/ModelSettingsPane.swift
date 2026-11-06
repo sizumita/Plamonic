@@ -47,7 +47,7 @@ struct ModelSettingsPane: View {
             } header: {
                 Text("ダウンロード")
             } footer: {
-                Text("モデルは ~/Library/Application Support/Plamonic/Models に保存されます。ダウンロードが途中で失敗したときは、済んだファイルを残して次回はその続きから始めます（キャンセルや削除で消えます）。サイズが大きいほど訳文の質は上がりますが、遅くなり、多くのメモリを使います。")
+                Text("モデルは ~/Library/Application Support/Plamonic/Models に保存されます。ダウンロードが途中で失敗したときは、済んだファイルを残して次回はその続きから始めます。残したファイルはキャンセルや削除をすると消えます。サイズが大きいほど訳文の質は上がりますが、遅くなり、多くのメモリを使います。")
             }
 
             Section("ライセンス") {
