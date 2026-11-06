@@ -16,8 +16,7 @@
 
 日本語 | [English](README.en.md)
 
-<!-- デモの GIF を docs/images/demo.gif に置いたら、次の行のコメントを外してください -->
-<!-- <img src="docs/images/demo.gif" width="820" alt="Slack の英語のメッセージが、その場で日本語に置き換わる様子"> -->
+<img src="docs/images/demo.gif" width="820" alt="Claude アプリの Claude Code タブにある英語の回答が、その場で日本語に置き換わる様子">
 
 </div>
 

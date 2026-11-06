@@ -17,8 +17,7 @@ Translation runs on your Mac with PLaMo 3 Translate, so the text never leaves it
 
 [日本語](README.md) | English
 
-<!-- Once docs/images/demo.gif exists, uncomment the next line -->
-<!-- <img src="docs/images/demo.gif" width="820" alt="English messages in Slack turning into Japanese in place"> -->
+<img src="docs/images/demo.gif" width="820" alt="An English reply in the Claude Code tab of the Claude app turning into Japanese in place">
 
 </div>
 
