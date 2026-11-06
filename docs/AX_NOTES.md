@@ -100,8 +100,25 @@ AXGroup dom=scroll-view → AXGroup/AXLandmarkRegion dom=scroll-view__viewport  
 
 ## DeepSeek Harness（com.deepseek.dsh）
 
-Electron。Web 部分の AX ツリーはまだ確かめていない（起動直後の画面では現れなかった。ログイン前の画面だったためかも
-しれない）。汎用の Web チャット規則（AXWebArea 内の段落まとめ、コードブロック除外）で扱い、未検証とする。
+Electron。DOM クラスは `ハッシュ_名前`（例 `tnXGgG_column`）で、前方一致の規則にはハッシュが入る。
+
+```
+AXWebArea → … → AXGroup dom=PIRFFq_frame
+ ├ AXButton dom=kB3qhq_newSession ほか            サイドバー上部（子として並ぶだけで、まとめる要素はない）
+ ├ AXStaticText                                     サイドバーの見出し
+ ├ AXGroup dom=Kjh-qa_treeBody
+ │  └ AXOutline dom=Kjh-qa_list                     スレッド一覧（ランドマークではない）
+ │     └ AXGroup dom=Kjh-qa_groupSection → AXRow/AXOutlineRow dom=JoiKIa_projectRow / JoiKIa_sessionRow
+ └ AXGroup dom=kiGsTW_root
+    ├ AXGroup/AXLandmarkBanner dom=kiGsTW_header
+    └ AXGroup dom=kiGsTW_body → kiGsTW_scrollBody
+       ├ AXGroup dom=tnXGgG_frame → tnXGgG_root → tnXGgG_column   ★会話（段落ごとの AXGroup、子に AXCodeStyleGroup）
+       └ AXGroup dom=kiGsTW_composerSeat                           入力欄
+```
+
+- スレッド一覧は `AXOutline` で、`AXLandmarkNavigation` ではない。汎用の Web チャット規則は `AXOutline` を除外する
+  （除外しないとスレッド名が訳される）。
+- 汎用の Web チャット規則（AXWebArea 内の段落まとめ、コードブロック・ナビゲーション・ツリー除外）で扱い、未検証とする。
 
 ## Google Chrome
 

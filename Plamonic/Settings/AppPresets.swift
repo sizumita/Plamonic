@@ -159,7 +159,7 @@ enum AppPresets {
         p.context = "A conversation between a user and an AI assistant in DeepSeek Harness."
         return AppPreset(
             profile: p, kind: .aiAssistant, verification: .unverified,
-            note: "未検証です。汎用の Web チャット規則（AXWebArea 内の段落、コードブロック・ナビゲーションは除外）を使います。うまく訳せない場合は「要素を調べる」でルールを調整してください。",
+            note: "未検証です。汎用の Web チャット規則（AXWebArea 内の段落、コードブロック・ナビゲーション・サイドバーのスレッド一覧は除外）を使います。うまく訳せない場合は「要素を調べる」でルールを調整してください。",
             coveredTools: ["DeepSeek Harness"])
     }()
 
@@ -225,7 +225,7 @@ enum AppPresets {
         ElementMatcher(domClassPrefixes: prefixes)
     }
 
-    /// Paragraphs inside the web area; code blocks, navigation and screen-reader-only text are skipped.
+    /// Paragraphs inside the web area; code blocks, navigation, tree views and screen-reader-only text are skipped.
     static func genericWebChatProfile(bundleID: String, displayName: String) -> AppProfile {
         var p = AppProfile(bundleID: bundleID, displayName: displayName)
         p.mode = .automatic
@@ -239,6 +239,8 @@ enum AppPresets {
                     "hljs", "shiki", "language-", "code-block", "md-code-block", "sr-only", "visually-hidden", "cm-",
                     "monaco-"),
                 ElementMatcher(subroles: ["AXLandmarkNavigation", "AXLandmarkBanner", "AXLandmarkComplementary"]),
+                // Sidebar thread / session lists are tree views and not marked as navigation (DeepSeek Harness).
+                ElementMatcher(roles: ["AXOutline"]),
             ])
         p.enableManualAccessibility = true
         return p
