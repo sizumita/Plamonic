@@ -396,7 +396,8 @@ jobs:
             scripts/appcast.sh feed "Plamonic" "${item}" >feed/appcast.xml
           else
             items=("${item}")
-            latest="$(gh api "repos/${GH_REPO}/releases/latest" --jq .tag_name 2>/dev/null || true)"
+            # Without a release, gh prints the 404's body to stdout: only a successful call names the latest release.
+            latest="$(gh api "repos/${GH_REPO}/releases/latest" --jq .tag_name 2>/dev/null)" || latest=""
             if [[ -n "${latest}" ]]; then
               if gh release download "${latest}" --pattern appcast.xml --dir "${RUNNER_TEMP}/release"; then
                 scripts/appcast.sh items "${RUNNER_TEMP}/release/appcast.xml" release >"${RUNNER_TEMP}/release-item.xml"
@@ -451,7 +452,8 @@ jobs:
             gh release upload "${TAG}" dist/* --clobber
             gh release upload "${TAG}" feed/appcast.xml --clobber
           else
-            previous="$(gh api "repos/${GH_REPO}/releases/latest" --jq .tag_name 2>/dev/null || true)"
+            # As in "Write the feed": the first release has no previous one.
+            previous="$(gh api "repos/${GH_REPO}/releases/latest" --jq .tag_name 2>/dev/null)" || previous=""
             start=()
             if [[ -n "${previous}" ]]; then
               start=(--notes-start-tag "${previous}")
