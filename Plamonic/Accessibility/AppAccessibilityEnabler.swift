@@ -40,18 +40,21 @@ final class AppAccessibilityEnabler: @unchecked Sendable {
         // attributeUnsupported and need no warm-up).
         var state = existing ?? State(enabledAt: .distantPast, manualResult: nil, enhancedResult: nil)
         var changed = false
-        // A timeout (cannotComplete) is left unrecorded so the next call retries.
         if needManual {
             let wasOn = app.bool(AXAttr.manualAccessibility) == true
-            let r = app.setAttribute(AXAttr.manualAccessibility, bool: true)
-            state.manualResult = r == .cannotComplete ? nil : r
+            let r = Self.outcome(app.setAttribute(AXAttr.manualAccessibility, bool: true)) {
+                app.bool(AXAttr.manualAccessibility)
+            }
+            state.manualResult = r
             state.manualWasOn = wasOn
             changed = changed || (r == .success && !wasOn)
         }
         if needEnhanced {
             let wasOn = app.bool(AXAttr.enhancedUserInterface) == true
-            let r = app.setAttribute(AXAttr.enhancedUserInterface, bool: true)
-            state.enhancedResult = r == .cannotComplete ? nil : r
+            let r = Self.outcome(app.setAttribute(AXAttr.enhancedUserInterface, bool: true)) {
+                app.bool(AXAttr.enhancedUserInterface)
+            }
+            state.enhancedResult = r
             state.enhancedWasOn = wasOn
             changed = changed || (r == .success && !wasOn)
         }
@@ -60,6 +63,15 @@ final class AppAccessibilityEnabler: @unchecked Sendable {
         states[pid] = state
         lock.unlock()
         return changed
+    }
+
+    /// What a set call did. Google Chrome answers notImplemented (-25208) to AXEnhancedUserInterface yet switches
+    /// its web tree on (and off again), so an error is a success when the value reads back as on.
+    /// nil: timed out (cannotComplete), left unrecorded so the next call retries.
+    static func outcome(_ result: AXError, readBack: () -> Bool?) -> AXError? {
+        if result == .cannotComplete { return nil }
+        if result != .success, readBack() == true { return .success }
+        return result
     }
 
     /// Applies the profile's switches: sets the enabled attributes, and turns back off an attribute we set

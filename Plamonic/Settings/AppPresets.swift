@@ -4,6 +4,7 @@ enum AppPresetKind: String, Sendable {
     case chat  // team chat (Slack, Discord)
     case aiAssistant  // AI chat / coding agent desktop apps
     case terminal  // terminal hosts for CLI agents
+    case browser  // web browsers (any site: generic page rules, manual by default)
 }
 
 enum PresetVerification: String, Sendable {
@@ -37,9 +38,14 @@ enum AppPresets {
     static let terminalBundleID = "com.apple.Terminal"
     static let ghosttyBundleID = "com.mitchellh.ghostty"
     static let iTerm2BundleID = "com.googlecode.iterm2"
+    static let safariBundleID = "com.apple.Safari"
+    static let chromeBundleID = "com.google.Chrome"
+    static let edgeBundleID = "com.microsoft.edgemac"
+    static let braveBundleID = "com.brave.Browser"
 
     static let all: [AppPreset] = [
         slack, discord, claude, codexDesktop, openCodeDesktop, deepSeekHarness, terminal, ghostty, iTerm2,
+        safari, chrome, edge, brave,
     ]
 
     private static let byBundleID: [String: AppPreset] = Dictionary(
@@ -219,6 +225,24 @@ enum AppPresets {
         #"[█▉▊▋▌▍▎░▒▓]{3,}"#,
     ]
 
+    // MARK: - Browsers
+
+    static let safari: AppPreset = browserPreset(
+        bundleID: safariBundleID, displayName: "Safari", chromium: false, verification: .verified,
+        note: "ページの本文を段落ごとに訳します。ヘッダ・ナビゲーション・検索欄・フッタ・コードブロックは訳しません。どのサイトでも同じ規則なので、はじめは手動（⌃⌥R）にしています。")
+
+    static let chrome: AppPreset = browserPreset(
+        bundleID: chromeBundleID, displayName: "Google Chrome", chromium: true, verification: .verified,
+        note: "Safari と同じ規則でページの本文を訳します。Chrome は AXEnhancedUserInterface をオンにしたときだけページの中身を公開するので、最初に訳すときに数秒かかります。この設定はウインドウのアニメーションを止めることがあり、訳すのをオフにするか Plamonic を終了すると元に戻します。")
+
+    static let edge: AppPreset = browserPreset(
+        bundleID: edgeBundleID, displayName: "Microsoft Edge", chromium: true, verification: .unverified,
+        note: "未検証です。Chrome と同じ方式（AXEnhancedUserInterface、ページ本文の汎用規則）で訳します。")
+
+    static let brave: AppPreset = browserPreset(
+        bundleID: braveBundleID, displayName: "Brave", chromium: true, verification: .unverified,
+        note: "未検証です。Chrome と同じ方式（AXEnhancedUserInterface、ページ本文の汎用規則）で訳します。")
+
     // MARK: - Builders
 
     private static func classes(_ prefixes: String...) -> ElementMatcher {
@@ -244,6 +268,44 @@ enum AppPresets {
             ])
         p.enableManualAccessibility = true
         return p
+    }
+
+    /// Any web page: paragraphs of the web area; site chrome (header, navigation, search, footer), code blocks,
+    /// tree views and screen-reader-only text are skipped. Sidebars (complementary) are kept: articles put prose
+    /// there. Manual by default, since the rules are not written for any one site.
+    static func browserProfile(bundleID: String, displayName: String, chromium: Bool) -> AppProfile {
+        var p = AppProfile(bundleID: bundleID, displayName: displayName)
+        p.mode = .manual
+        p.scope = .rules
+        p.granularity = .paragraph
+        p.rules = ExtractionRules(
+            containers: [ElementMatcher(roles: ["AXWebArea"])],
+            items: [],
+            excludes: [
+                ElementMatcher(subroles: [
+                    "AXLandmarkNavigation", "AXLandmarkBanner", "AXLandmarkSearch", "AXLandmarkContentInfo",
+                ]),
+                // Safari's <pre>. Chrome exposes <pre> as a plain group; the code filter and the highlighter
+                // classes below catch its code. Never exclude AXCodeStyleGroup: inline <code> is part of sentences.
+                ElementMatcher(subroles: ["AXPreformattedStyleGroup"]),
+                ElementMatcher(roles: ["AXOutline"]),
+                classes(
+                    "hljs", "shiki", "language-", "cm-", "monaco-", "sr-only", "visually-hidden", "mw-editsection"),
+            ])
+        p.context = "A web page the user is reading in a web browser."
+        // Chrome builds its web tree only for AXEnhancedUserInterface (AXManualAccessibility is Electron's);
+        // Safari always exposes it.
+        p.enableManualAccessibility = false
+        p.enableEnhancedUserInterface = chromium
+        return p
+    }
+
+    private static func browserPreset(
+        bundleID: String, displayName: String, chromium: Bool, verification: PresetVerification, note: String
+    ) -> AppPreset {
+        AppPreset(
+            profile: browserProfile(bundleID: bundleID, displayName: displayName, chromium: chromium),
+            kind: .browser, verification: verification, note: note, coveredTools: [])
     }
 
     private static func terminalPreset(

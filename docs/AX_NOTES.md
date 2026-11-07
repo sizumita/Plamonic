@@ -2,7 +2,7 @@
 
 対応アプリのアクセシビリティ（AX）の構造と振る舞いを、2026 年 11 月時点の実測でまとめる。アプリの更新で変わることがある。
 
-対応アプリ: Slack, Discord, Claude（Claude Code）, Codex, OpenCode, DeepSeek Harness、ターミナルの CLI。
+対応アプリ: Slack, Discord, Claude（Claude Code）, Codex, OpenCode, DeepSeek Harness、ターミナルの CLI、Safari、Google Chrome。
 
 走査コスト（`AXUIElementCopyMultipleAttributeValues` で 1 要素 1 IPC）:
 Slack 435 要素 25ms、Discord 1700 要素 62ms、Safari 318 要素 20ms、メッセージ 72 要素 22ms。
@@ -120,13 +120,44 @@ AXWebArea → … → AXGroup dom=PIRFFq_frame
   （除外しないとスレッド名が訳される）。
 - 汎用の Web チャット規則（AXWebArea 内の段落まとめ、コードブロック・ナビゲーション・ツリー除外）で扱い、未検証とする。
 
-## Google Chrome
+## ブラウザ（Safari / Google Chrome）
 
-- Chrome（Electron ではない）は `AXManualAccessibility` に -25205（attributeUnsupported）を返す。一時プロファイルの
-  Chrome は `--force-renderer-accessibility`（または `AXEnhancedUserInterface`）でないと Web 部分の AX ツリーを出さない。
-  ふだんの Chrome は、ほかの支援アプリがオンにしていないと読めないことがある。
+記事風のテスト用ページ（ヘッダ・nav・検索欄・本文・コードブロック・表・サイドバー・コメント欄・フッタ）と、
+Wikipedia・MDN・GitHub のページで確認した（Safari 27、Chrome 156）。
+
+```
+Safari:  AXWindow → AXSplitGroup → AXTabGroup → AXGroup id=BrowserView… → AXGroup → AXScrollArea → AXWebArea
+Chrome:  AXWindow → AXGroup dom=BrowserRootView → … → AXGroup dom=ContentsContainerView → AXScrollArea → AXWebArea
+AXWebArea → AXGroup/AXLandmarkBanner（nav = AXLandmarkNavigation、検索 = AXLandmarkSearch）
+          → AXGroup/AXLandmarkMain → AXGroup/AXDocumentArticle → AXHeading, AXGroup(段落), AXList/AXContentList, AXTable
+          → AXGroup/AXLandmarkComplementary（サイドバー）→ AXGroup/AXLandmarkContentInfo（フッタ）
+```
+
+- Safari は何もしなくても Web の AX ツリーを出す。Chrome は `AXManualAccessibility` に -25205 を返し、
+  `AXEnhancedUserInterface` をオンにしたときだけ出す。Chrome はこの設定に（オンにもオフにも）-25208
+  （notImplemented）を返すが、値は変わり、ツリーも作られる・捨てられる。→ 設定したあとに読み直した値で成否を決める
+  （`AppAccessibilityEnabler.outcome`）。エラーを失敗とみなすと、ウォームアップが始まらず、終了時にも戻さない。
+  オンにしてから 3 秒でツリーはそろう。
+- どちらも `AXDOMClassList` を公開し、ランドマークは subrole になる。汎用のページ規則（AXWebArea をコンテナ、
+  banner・navigation・search・contentinfo・AXOutline・コードブロックを除外）で本文・見出し・リスト・表・引用が
+  段落ごとに取れ、文字の大きさと色もすべて読める。サイドバー（complementary）には記事の文章もあるので除外しない。
+- `<pre>`: Safari は `AXGroup/AXPreformattedStyleGroup`、Chrome は subrole のない AXGroup。中の `<code>` はどちらも
+  `AXCodeStyleGroup` で、文中の `<code>` と同じ。→ AXCodeStyleGroup は除外しない（文が切れる）。
+  ハイライト用のクラス（`language-`・`hljs`・`shiki`）とコード判定で落とす。
+- スキップリンク（「Skip to content」、Wikipedia の `mw-jump-link`）はフォーカスされるまで 1x1 の `AXLink`。Chrome は
+  中の文字も 1pt に潰すが、Safari は文字に 53x54 などの矩形を返す。→ 自分の矩形が 1x1 のリンクは見えないものとする。
+- Chrome は `<span>` を subrole のない AXGroup として出す。Wikipedia の出典は `AXLink > AXGroup(mw-reflink-text) >
+  "[2]"`、`AXSuperscriptStyleGroup > AXGroup > ": p1"`。インラインの要素の中にグループが 1 つだけあるときは、
+  段落にせず親に渡す（親が同じ行の前後とつなぐ）。段落にすると文がそこで切れ、`[2]` は文字なしで捨てられ、
+  `: p1` は矩形の重なりで段落の先頭に足される。Safari はこれらのグループを出さない。
+- 読み上げ専用の `<span class="sr-only">` は、どちらも span を出さずに AXStaticText だけを残す（クラスが読めない）。
+  1px の箱で折り返した矩形（例 49x68）が次の見出しと重なり、つながってしまう。今は防げない。
+- 走査: 記事のページはキャッシュ後 Safari 8〜40ms、Chrome 20〜40ms。GitHub のリポジトリのページは 750 要素前後で
+  Safari 200ms、Chrome 55ms。GitHub のようなアプリ風のページでは、ファイル一覧・コミットメッセージ・日付も拾う
+  （サイトごとの規則がない）。そのため既定は手動。
 - テスト用に Chrome を起動すると、`open -n -g` でも約 2 秒後に前面に出る。macOS はほかのアプリで押したリンクを
-  いちばん新しい Chrome のインスタンスで開くことがある。
+  いちばん新しい Chrome のインスタンスで開くことがある。同じ `--user-data-dir` で Chrome を起動し直すと、
+  URL はそのインスタンスの新しいタブで開く。
 
 ## ターミナル（Claude Code / Codex / OpenCode の CLI）
 

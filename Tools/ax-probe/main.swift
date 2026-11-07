@@ -24,6 +24,7 @@ let usage = """
       --obstacles              list the frames of the obstacles (no text)
       --links                  list each segment's links (range, kind, URL, frames, color; masked unless --show-text)
       --show-text              print real text (only for the user's own inspection)
+      --full-text              print whole segments instead of the first 90 characters
       --tree [depth]           dump the window's AX tree (masked) instead of scanning
       --inspect x,y            AXInspector path at an AX point
       --events seconds         print AXEventHub notifications for a while
@@ -296,7 +297,7 @@ if let snap = last {
         let frame = fmt(s.axFrame).padding(toLength: 22, withPad: " ", startingAt: 0)
         let role = s.role.padding(toLength: 13, withPad: " ", startingAt: 0)
         let look = describe(s.style, lines: s.lineFrames.count).padding(toLength: 30, withPad: " ", startingAt: 0)
-        print("  \(order) \(frame) \(role) \(look) \(String(s.text.count).padding(toLength: 4, withPad: " ", startingAt: 0)) \"\(shown(s.text))\"\(s.isEditable ? " (editable)" : "")")
+        print("  \(order) \(frame) \(role) \(look) \(String(s.text.count).padding(toLength: 4, withPad: " ", startingAt: 0)) \"\(shown(s.text, limit: args.contains("--full-text") ? Int.max : 90))\"\(s.isEditable ? " (editable)" : "")")
         if args.contains("--links") {
             for l in s.links {
                 var line = "      ↳ \(l.kind.rawValue) \(l.range.lowerBound)..<\(l.range.upperBound) \"\(shown(l.text, limit: 50))\""

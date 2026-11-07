@@ -69,7 +69,10 @@ also translate the whole window, just the paragraph under the pointer, or just t
 | ✅ | Claude (Claude Code tab) | Chat messages |
 | ✅ | OpenCode (desktop) | Body paragraphs |
 | ✅ | Terminal | Output, for example from the Claude Code, Codex and OpenCode CLIs |
+| ✅ | Safari | Page text. The same rules apply to every site, so it starts in manual mode: press ⌃⌥R |
+| ✅ | Google Chrome | Page text, as in Safari. The first translation takes a few seconds |
 | 🟡 | iTerm2 | Output, the same way as Terminal |
+| 🟡 | Microsoft Edge, Brave | Page text, the same way as Chrome |
 | 🟡 | Codex (desktop) | Chat messages |
 | 🟡 | DeepSeek Harness | Chat messages |
 | ❌ | Ghostty | Not supported: it does not tell macOS where its characters are |
