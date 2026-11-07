@@ -61,7 +61,10 @@ Slack や Discord ならメッセージの本文だけ、ターミナルなら�
 | ✅ | Claude（Claude Code タブ） | チャットのメッセージ |
 | ✅ | OpenCode（デスクトップ版） | 本文の段落 |
 | ✅ | ターミナル（Terminal.app） | 出力（Claude Code / Codex / OpenCode の CLI など） |
+| ✅ | Safari | ページの本文（どのサイトでも同じ規則なので、はじめは手動。⌃⌥R で訳します） |
+| ✅ | Google Chrome | ページの本文（Safari と同じ。はじめて訳すときに数秒かかります） |
 | 🟡 | iTerm2 | 出力（ターミナルと同じ方式） |
+| 🟡 | Microsoft Edge・Brave | ページの本文（Chrome と同じ方式） |
 | 🟡 | Codex（デスクトップ版） | チャットのメッセージ |
 | 🟡 | DeepSeek Harness | チャットのメッセージ |
 | ❌ | Ghostty | 訳せません（文字の位置を macOS に公開していないため） |

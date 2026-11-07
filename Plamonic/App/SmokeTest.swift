@@ -7,7 +7,8 @@ import Foundation
 /// `--show-overlays` draws the overlays for a visual check (still never activates or takes focus) and measures
 /// the window's colors when Screen Recording is granted.
 /// `--final <size>`, `--progressive on|off` and `--burst-threshold <n>` change the translation model and 段階翻訳
-/// in the test's private copy of the settings. `--pid <pid>` picks one process of the app (a second instance
+/// in the test's private copy of the settings. `--use-preset` drops the app's saved profile from that copy, so the
+/// built-in preset applies. `--pid <pid>` picks one process of the app (a second instance
 /// started for a test page) instead of the first one.
 /// Links (DESIGN §6.1, need `--show-overlays`): `--activate-first-link` runs what a click on the first link drawn
 /// in a translation does and reports what happened; with `--dry-run-links` nothing is pressed or opened.
@@ -35,6 +36,7 @@ struct SmokeTestOptions {
     var progressive: Bool?
     var burstThreshold: Int?
     var pid: pid_t?
+    var usePreset = false
     var activateFirstLink = false
     var contextMenuFirstLink = false
     var hoverFirstLink = false
@@ -64,6 +66,7 @@ struct SmokeTestOptions {
         if let p = arguments.firstIndex(of: "--pid"), arguments.count > p + 1 {
             pid = pid_t(arguments[p + 1])
         }
+        usePreset = arguments.contains("--use-preset")
         activateFirstLink = arguments.contains("--activate-first-link")
         contextMenuFirstLink = arguments.contains("--context-menu-first-link")
         hoverFirstLink = arguments.contains("--hover-first-link")
@@ -251,6 +254,9 @@ final class SmokeTest {
         try? FileManager.default.copyItem(at: SettingsStore.defaultFileURL, to: settingsURL)
         let settings = SettingsStore(fileURL: settingsURL)
         settingsStore = settings
+        if options.usePreset {
+            settings.resetToPreset(bundleID: options.bundleID)
+        }
         if let model = options.finalModel {
             settings.updateGlobal { $0.finalModel = model }
         }

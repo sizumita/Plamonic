@@ -102,6 +102,7 @@ plamonic=build/DD/Build/Products/Debug/Plamonic.app/Contents/MacOS/Plamonic
 | Option | Effect |
 | --- | --- |
 | `--pid <pid>` | One process of the app, such as a copy started for the test |
+| `--use-preset` | Ignores the app's saved profile and uses its built-in preset |
 | `--target <language>`, `--final <size>`, `--progressive on\|off`, `--burst-threshold <n>` | The target language, the model, progressive translation and the burst pause, for this run only |
 | `--password-guard <seconds>` | Checks for password entry at this interval (default 0.25, 0.05–5) and logs every change of what it sees (app names only) |
 | `--show-overlays` | Draws the translations, and logs the links mapped into them and the click areas |

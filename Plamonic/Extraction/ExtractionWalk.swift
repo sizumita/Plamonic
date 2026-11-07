@@ -358,6 +358,10 @@ final class ExtractionWalk {
         }
 
         let isInline = ExtractionRoles.isInline(role: role, subrole: info.subrole)
+        if role == "AXLink", Self.isFocusOnlyLink(info.frame, minVisible: limits.minVisibleHeight) {
+            prunedInvisible += 1
+            return .none
+        }
         if !isInline {
             switch visibility(info.frame, clip) {
             case .invisible:
@@ -486,8 +490,20 @@ final class ExtractionWalk {
             let run = Run(parts: parts, role: info.role, treeIndex: index, element: info.element)
             if isInline { return .inline(run) }
             if isControl { return .block(run, mergeable: true, keepAlone: true) }
-            let mergeable = info.role == "AXGroup" && (info.subrole == nil || info.subrole == "AXEmptyGroup")
+            let mergeable = Self.isPlainGroup(role: info.role, subrole: info.subrole)
             return .block(run, mergeable: mergeable, keepAlone: true)
+        }
+
+        // A link or superscript around one <span> group (Chrome's Wikipedia citations: AXLink > AXGroup > "[2]")
+        // hands the group up, so the parent can still join it to the line it sits on. Emitted here, it would
+        // split the sentence around it.
+        if Self.passesBlockThrough(resolved, role: info.role, subrole: info.subrole, isInline: isInline),
+            case .block(var run, _, _) = resolved[0]
+        {
+            if info.subrole == "AXCodeStyleGroup" {
+                for i in run.parts.indices { run.parts[i].isCode = true }
+            }
+            return .block(run, mergeable: true, keepAlone: true)
         }
 
         var current: [Part] = []
@@ -517,6 +533,25 @@ final class ExtractionWalk {
         }
         emitCurrent()
         return .boundary
+    }
+
+    /// A skip link ("Skip to content", "Jump to content") is a 1x1 link until it gets the keyboard focus.
+    /// Safari still gives its text a full-size frame, so the link's own frame decides.
+    static func isFocusOnlyLink(_ frame: CGRect?, minVisible: CGFloat) -> Bool {
+        guard let f = frame else { return false }
+        return f.width < minVisible && f.height < minVisible
+    }
+
+    /// Generic groups Chromium exposes for <span> / <div>: their text may join the line around them.
+    static func isPlainGroup(role: String, subrole: String?) -> Bool {
+        role == "AXGroup" && (subrole == nil || subrole == "AXEmptyGroup")
+    }
+
+    /// The node's only piece is a block that may still join a line, and the node itself flows in a line (inline
+    /// formatting, a link) or is a plain group: pass the block up instead of emitting it as a paragraph.
+    static func passesBlockThrough(_ resolved: [Piece], role: String, subrole: String?, isInline: Bool) -> Bool {
+        guard resolved.count == 1, case .block(_, let mergeable, _) = resolved[0], mergeable else { return false }
+        return isInline || isPlainGroup(role: role, subrole: subrole)
     }
 
     /// Parts not inside a link yet belong to `mark` (the innermost link wins).

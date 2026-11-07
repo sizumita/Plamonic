@@ -83,6 +83,23 @@ enum ProbePresets {
                 m(roles: ["AXOutline"]),
             ]
         },
+        Preset(name: "browser", bundleIDs: [
+            "com.apple.Safari", "com.google.Chrome", "com.microsoft.edgemac", "com.brave.Browser",
+        ]) { p in
+            // Any web page (AppPresets.browserProfile).
+            p.scope = .rules
+            p.granularity = .paragraph
+            p.rules.containers = [m(roles: ["AXWebArea"])]
+            p.rules.excludes = [
+                m(subroles: ["AXLandmarkNavigation", "AXLandmarkBanner", "AXLandmarkSearch", "AXLandmarkContentInfo"]),
+                m(subroles: ["AXPreformattedStyleGroup"]),
+                m(roles: ["AXOutline"]),
+                m(dom: ["hljs", "shiki", "language-", "cm-", "monaco-", "sr-only", "visually-hidden", "mw-editsection"]),
+            ]
+            // Chrome builds its web tree only for AXEnhancedUserInterface; Safari always has it.
+            p.enableManualAccessibility = false
+            p.enableEnhancedUserInterface = true
+        },
         Preset(name: "none", bundleIDs: []) { p in
             p.scope = .window
         },

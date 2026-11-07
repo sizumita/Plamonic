@@ -9,7 +9,8 @@ final class SettingsPresetsTests: XCTestCase {
         for id in [
             "com.tinyspeck.slackmacgap", "com.hnc.Discord", "com.anthropic.claudefordesktop", "com.openai.codex",
             "ai.opencode.desktop", "com.deepseek.dsh", "com.apple.Terminal", "com.mitchellh.ghostty",
-            "com.googlecode.iterm2",
+            "com.googlecode.iterm2", "com.apple.Safari", "com.google.Chrome", "com.microsoft.edgemac",
+            "com.brave.Browser",
         ] {
             XCTAssertTrue(ids.contains(id), "missing preset for \(id)")
         }
@@ -17,8 +18,10 @@ final class SettingsPresetsTests: XCTestCase {
 
     func testPresetsAreWellFormed() {
         for preset in AppPresets.all {
-            // An app that cannot be translated is off, so it is not scanned for nothing.
-            let expectedMode: TranslationMode = preset.verification == .unsupported ? .off : .automatic
+            // An app that cannot be translated is off, so it is not scanned for nothing. Browsers wait for the
+            // hotkey: their rules are not written for any one site.
+            let expectedMode: TranslationMode =
+                preset.verification == .unsupported ? .off : preset.kind == .browser ? .manual : .automatic
             XCTAssertEqual(preset.profile.mode, expectedMode, preset.bundleID)
             XCTAssertFalse(preset.profile.context.isEmpty, preset.bundleID)
             XCTAssertFalse(preset.note.isEmpty, preset.bundleID)
@@ -75,6 +78,29 @@ final class SettingsPresetsTests: XCTestCase {
         // DeepSeek Harness lists its threads in an AXOutline that is not a navigation landmark.
         let deepSeek = AppPresets.deepSeekHarness.profile.rules
         XCTAssertTrue(deepSeek.excludes.contains { $0.roles == ["AXOutline"] })
+    }
+
+    func testBrowserRules() {
+        let browsers = AppPresets.all.filter { $0.kind == .browser }
+        XCTAssertEqual(
+            Set(browsers.map(\.bundleID)),
+            [AppPresets.safariBundleID, AppPresets.chromeBundleID, AppPresets.edgeBundleID, AppPresets.braveBundleID])
+        for preset in browsers {
+            let p = preset.profile
+            XCTAssertEqual(p.scope, .rules, preset.bundleID)
+            XCTAssertEqual(p.rules.containers, [ElementMatcher(roles: ["AXWebArea"])], preset.bundleID)
+            // Inline <code> is part of sentences; only Safari's <pre> group is skipped.
+            XCTAssertFalse(p.rules.excludes.contains { $0.subroles.contains("AXCodeStyleGroup") }, preset.bundleID)
+            XCTAssertTrue(p.rules.excludes.contains { $0.subroles.contains("AXPreformattedStyleGroup") })
+            XCTAssertTrue(p.rules.excludes.contains { $0.subroles.contains("AXLandmarkNavigation") })
+            // Sidebars of articles hold prose.
+            XCTAssertFalse(p.rules.excludes.contains { $0.subroles.contains("AXLandmarkComplementary") })
+            // Chromium browsers ignore AXManualAccessibility (-25205) and need AXEnhancedUserInterface.
+            XCTAssertFalse(p.enableManualAccessibility, preset.bundleID)
+            XCTAssertEqual(p.enableEnhancedUserInterface, preset.bundleID != AppPresets.safariBundleID, preset.bundleID)
+        }
+        XCTAssertEqual(AppPresets.safari.verification, .verified)
+        XCTAssertEqual(AppPresets.chrome.verification, .verified)
     }
 
     func testTerminalIgnorePatterns() {
