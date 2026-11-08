@@ -50,6 +50,38 @@ enum PartialScanPolicy {
     }
 }
 
+/// What a scroll or drag hides while 「スクロール中は隠す」 is on. A window whose scan found separately scrolling
+/// areas (`WindowSnapshot.scrollRegions`: a chat panel and a side chat) hides only the translations in the area
+/// under the pointer; a scroll in none of them (a thread list) hides nothing.
+enum ScrollHidePolicy {
+    enum Hit: Equatable {
+        /// The whole window's overlay (its areas are unknown).
+        case window
+        /// The translations in these areas.
+        case regions([CGRect])
+        /// Nothing the window translates moves.
+        case none
+    }
+
+    static func hit(at point: CGPoint, regions: [CGRect]) -> Hit {
+        guard !regions.isEmpty else { return .window }
+        let hit = regions.filter { $0.contains(point) }
+        return hit.isEmpty ? .none : .regions(hit)
+    }
+
+    /// The items still drawn while the `hidden` areas scroll.
+    static func visible(_ items: [OverlayItem], hiding hidden: [CGRect]) -> [OverlayItem] {
+        guard !hidden.isEmpty else { return items }
+        return items.filter { item in !hidden.contains { Self.overlaps($0, item.axFrame) } }
+    }
+
+    /// Touching edges do not count: areas side by side share an edge with each other's items.
+    private static func overlaps(_ area: CGRect, _ frame: CGRect) -> Bool {
+        let i = area.standardized.intersection(frame.standardized)
+        return !i.isNull && i.width > 0.5 && i.height > 0.5
+    }
+}
+
 /// Passes mouse moves to the overlay at most once per `interval`. A point held back is followed by a trailing
 /// update, so the overlay always learns where the pointer came to rest (its rest timers depend on it).
 struct MouseMoveThrottle {

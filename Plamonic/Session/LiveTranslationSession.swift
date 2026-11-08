@@ -72,6 +72,8 @@ final class LiveTranslationSession {
         var lastScan: CFAbsoluteTime = 0
         var axFrame: CGRect = .zero
         var clip: CGRect?
+        /// Areas that scroll on their own (`WindowSnapshot.scrollRegions`); empty = the whole window.
+        var scrollRegions: [CGRect] = []
         /// Segments of the last snapshot passed to the coordinator.
         var segmentCount = 0
         var truncatedStreak = 0
@@ -163,7 +165,13 @@ final class LiveTranslationSession {
     private var scanInFlight = false
     private var timer: DispatchSourceTimer?
     private var workspaceObservers: [NSObjectProtocol] = []
+    /// Windows with translations hidden by a scroll: the whole overlay, or the areas in `scrollHiddenRegions`.
     private var scrollHidden: Set<WindowKey> = []
+    /// Areas of a window whose translations are left out while they scroll (ScrollHidePolicy).
+    private var scrollHiddenRegions: [WindowKey: [CGRect]] = [:]
+    /// Windows scrolled outside every area they translate: nothing is hidden, but they are rescanned once
+    /// the scroll stops, in case something moved after all (a divider dragged between two panels).
+    private var scrollRescan: Set<WindowKey> = []
     private var scrollQuietDeadline: CFAbsoluteTime?
     private var unhideRequested: Set<WindowKey> = []
     /// Mouse moves passed to the overlay (hover popups, originals shown in place, click panels).
@@ -261,6 +269,8 @@ final class LiveTranslationSession {
         overlay?.revealOriginal = false
         coordinator.cancelAll()
         scrollHidden.removeAll()
+        scrollHiddenRegions.removeAll()
+        scrollRescan.removeAll()
         scrollQuietDeadline = nil
         unhideRequested.removeAll()
         hoverMoves.reset()
@@ -472,6 +482,8 @@ final class LiveTranslationSession {
             overlay?.remove(window: key)
             coordinator.forget(window: key)
             scrollHidden.remove(key)
+            scrollHiddenRegions[key] = nil
+            scrollRescan.remove(key)
         }
         hideSelection(target)
         if target.observed, let hub = eventHub {
@@ -614,7 +626,8 @@ final class LiveTranslationSession {
             // Scrolling / dragging stopped: rescan the hidden windows and show them again afterwards.
             scrollQuietDeadline = nil
             unhideRequested.formUnion(scrollHidden)
-            for key in scrollHidden { targets[key.pid]?.forceScan = true }
+            for key in scrollHidden.union(scrollRescan) { targets[key.pid]?.forceScan = true }
+            scrollRescan.removeAll()
         }
         if passwordPause != nil {
             // Nothing is read while a password is typed. What is due waits: the end of the pause rescans.
@@ -865,6 +878,7 @@ final class LiveTranslationSession {
         track.segmentCount = snapshot.segments.count
         track.axFrame = snapshot.axWindowFrame
         track.clip = snapshot.axClipRect
+        track.scrollRegions = snapshot.scrollRegions
         track.shown = true
         target.windows[key] = track
         let items = coordinator.process(snapshot: snapshot, settings: settings)
@@ -875,6 +889,8 @@ final class LiveTranslationSession {
     private func draw(_ key: WindowKey, items: [OverlayItem], target: AppTarget) {
         guard let overlay, let track = target.windows[key], track.shown else { return }
         let settings = target.settings
+        // Translations in an area that is scrolling stay out until the scan after the scroll places them anew.
+        let items = ScrollHidePolicy.visible(items, hiding: scrollHiddenRegions[key] ?? [])
         overlay.update(
             window: key, axWindowFrame: track.axFrame, axClipRect: track.clip, cgWindowID: track.cgWindowID,
             items: items, obstacles: coordinator.obstacles(for: key),
@@ -893,6 +909,7 @@ final class LiveTranslationSession {
     private func unhide(_ key: WindowKey) {
         guard scrollHidden.remove(key) != nil else { return }
         overlay?.setTemporarilyHidden(false, window: key)
+        if scrollHiddenRegions.removeValue(forKey: key) != nil { redraw(key) }
     }
 
     /// Shows windows hidden while scrolling again once a scan redrew them, or once nothing of them is shown.
@@ -925,6 +942,7 @@ final class LiveTranslationSession {
         guard var track = target.windows[key] else { return nil }
         track.axFrame = snapshot.axWindowFrame
         track.clip = snapshot.axClipRect
+        track.scrollRegions = snapshot.scrollRegions
         track.segmentCount = snapshot.segments.count
         track.shown = true
         track.manualSignature = Self.signature(snapshot)
@@ -952,6 +970,7 @@ final class LiveTranslationSession {
         // Same content; the window may have moved, so pass the new frames on.
         track.axFrame = snapshot.axWindowFrame
         track.clip = snapshot.axClipRect
+        track.scrollRegions = snapshot.scrollRegions
         target.windows[key] = track
         let items = coordinator.process(snapshot: snapshot, settings: target.settings)
         draw(key, items: items, target: target)
@@ -1241,12 +1260,36 @@ final class LiveTranslationSession {
             for (key, track) in target.windows
             where (track.shown || target.selection?.window == key) && track.axFrame.contains(point) {
                 hit = true
-                if scrollHidden.insert(key).inserted { overlay?.setTemporarilyHidden(true, window: key) }
+                let popup = target.selection?.window == key
+                switch popup ? .window : ScrollHidePolicy.hit(at: point, regions: track.scrollRegions) {
+                case .window:
+                    hideWhileScrolling(key)
+                case .regions(let areas):
+                    var hidden = scrollHiddenRegions[key] ?? []
+                    let added = areas.filter { !hidden.contains($0) }
+                    guard !added.isEmpty else { break }
+                    hidden += added
+                    if track.scrollRegions.allSatisfy(hidden.contains) {
+                        // Every area moves (the window's only chat panel): the whole overlay goes at once.
+                        hideWhileScrolling(key)
+                    } else {
+                        scrollHidden.insert(key)
+                        scrollHiddenRegions[key] = hidden
+                        redraw(key)
+                    }
+                case .none:
+                    scrollRescan.insert(key)
+                }
             }
         }
         guard hit else { return }
         scrollQuietDeadline = CFAbsoluteTimeGetCurrent() + Self.scrollQuietDelay
         reschedule()
+    }
+
+    private func hideWhileScrolling(_ key: WindowKey) {
+        scrollHidden.insert(key)
+        overlay?.setTemporarilyHidden(true, window: key)
     }
 
     private func mouseMoved(to point: CGPoint) {
