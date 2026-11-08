@@ -102,7 +102,8 @@ final class TextExtractor {
         diagnostics.warmingUp = AppAccessibilityEnabler.shared.isWarmingUp(pid: pid)
 
         func snapshot(
-            frame: CGRect, clip: CGRect?, segments: [TextSegment], walk: ExtractionWalk?, obstacles: [CGRect] = []
+            frame: CGRect, clip: CGRect?, segments: [TextSegment], walk: ExtractionWalk?, obstacles: [CGRect] = [],
+            scrollRegions: [CGRect] = []
         ) -> WindowSnapshot {
             if let walk {
                 diagnostics.prunedInvisible = walk.prunedInvisible
@@ -114,7 +115,7 @@ final class TextExtractor {
                 key: key, pid: pid, bundleID: bundleID, axWindowFrame: frame, axClipRect: clip, segments: segments,
                 nodeCount: walk?.nodeCount ?? 0, scanDuration: CFAbsoluteTimeGetCurrent() - start,
                 truncated: walk?.truncated ?? false, obstacles: Self.keptObstacles(obstacles, segments: segments),
-                passwordPrompt: walk?.passwordPrompt ?? false)
+                scrollRegions: scrollRegions, passwordPrompt: walk?.passwordPrompt ?? false)
         }
 
         // Never read our own windows (overlays, settings).
@@ -126,6 +127,7 @@ final class TextExtractor {
             settings: settings, limits: limits, ignore: ignorePatterns(settings.profile.ignorePatterns), start: start)
         let rules = settings.profile.rules
         var clipRect: CGRect?
+        var scrollRegions: [CGRect] = []
         var relaxedFilters = false
         var keepNear: CGPoint?
         // Scopes that read one element know nothing of what is around it.
@@ -149,6 +151,7 @@ final class TextExtractor {
                         if !i.isNull { clip = i }
                     }
                     clipRect = clipRect.map { $0.union(clip) } ?? clip
+                    scrollRegions.append(clip)
                     walk.walk(root: c.element, clip: clip, itemsOnly: rules.hasItems, transform: c.transform)
                 }
                 // No container in this window (e.g. Claude's chat tab): items are searched in the whole window.
@@ -199,7 +202,11 @@ final class TextExtractor {
             // the element.
             clipRect = Self.elementClip(elementFrame, segments: segments, window: windowFrame)
         }
-        return snapshot(frame: windowFrame, clip: clipRect, segments: segments, walk: walk, obstacles: obstacles)
+        // Each container scrolls on its own (a chat and a side chat); a scroll outside all of them (a thread list)
+        // moves none of the translations.
+        return snapshot(
+            frame: windowFrame, clip: clipRect, segments: segments, walk: walk, obstacles: obstacles,
+            scrollRegions: scrollRegions)
     }
 
     /// The element a scope read, grown to its segments (text may stick out of its element, like a list marker

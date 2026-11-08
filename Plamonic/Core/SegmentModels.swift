@@ -147,6 +147,9 @@ struct WindowSnapshot: Sendable {
     /// Visible content that is not translated and is not part of any segment (names, timestamps, buttons,
     /// excluded parts, terminal borders and prompts), AX coordinates. The overlay keeps translations off it.
     var obstacles: [CGRect] = []
+    /// Areas of the window that scroll on their own (the visible part of each rule container: a chat panel,
+    /// a side chat), AX coordinates. Empty = unknown: a scroll anywhere in the window moves everything.
+    var scrollRegions: [CGRect] = []
     /// Terminal mode: the line with the insertion point or the last non-empty line waits for a password
     /// (`Password:`, `[sudo] password for …:`, `パスワード:`…; see TerminalPasswordPrompt). The session stops
     /// reading that window until its content changes. Set by the extraction.
