@@ -84,6 +84,15 @@ AXGroup dom=group/message-row,relative,flex,w-full
 ```
 
 - `epitaxy-chat-panel-body` をコンテナにすると、走査する要素が 167 → 96 に減る。`group/tool` も除外する。
+- サイドチャットは右側のペイン（`AXGroup/AXLandmarkRegion`、タブ付き）。名前の付いたクラスがなく、会話のスクロール領域
+  `h-full,overflow-y-auto,overflow-x-hidden,[contain:strict],[scrollbar-gutter:stable_both-edges],…` の中に、
+  メインと同じ `AXDocumentArticle` → `group/message-row` が並ぶ。`[scrollbar-gutter:stable_both-edges]` を持つのは
+  メインとサイドの会話のスクロール領域だけなので、これをコンテナに加える（メインのものは `epitaxy-chat-panel-body` の中で、
+  そちらが先に一致する）。自分のメッセージ（`rounded-[var(--cds-message-bubble-radius)]` の吹き出し）はどちらも
+  `group/message-row` の外にあり、訳さない。
+- サイドチャットを開いた直後は、見えている行まで「幅いっぱい × 高さ 1pt」で返ることがある。数秒でそろう。
+- メインとサイドは別々にスクロールする。コンテナごとの範囲（`WindowSnapshot.scrollRegions`）で、スクロールした側の
+  訳文だけを隠す。左のスレッド一覧（`AXLandmarkComplementary`）のスクロールでは何も隠さない。
 - ファイル参照は本文中の葉の `AXButton`（DOM クラス `inline box-decoration-clone prose-link`、子なし、URL なし）。
   境界として扱うと段落が 2 つに割れ、後半の外接矩形が前半の 2 行目に重なる（訳文どうしが重なって見える）ので、
   文の一部として扱う。

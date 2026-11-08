@@ -116,9 +116,12 @@ enum AppPresets {
         p.scope = .rules
         p.granularity = .paragraph
         p.rules = ExtractionRules(
-            // The Claude Code chat panel. The chat tab has none; TextExtractor then searches the whole window
-            // for the items (a rule set with items falls back to the window when no container is found).
-            containers: [classes("epitaxy-chat-panel-body")],
+            // The Claude Code chat panel, and the side chat's transcript scroller (it has no named class; of the
+            // window's elements only the two transcript scrollers carry this one, and the chat panel's is inside
+            // its panel, which is matched first). Each scrolls on its own (WindowSnapshot.scrollRegions).
+            // The chat tab has none; TextExtractor then searches the whole window for the items (a rule set with
+            // items falls back to the window when no container is found).
+            containers: [classes("epitaxy-chat-panel-body"), classes("[scrollbar-gutter:stable_both-edges]")],
             // group/message-row is measured (Claude Code tab); the font-* classes are for the chat tab (unverified).
             items: [classes("group/message-row", "font-user-message", "font-claude-response")],
             excludes: [
@@ -130,7 +133,7 @@ enum AppPresets {
         p.enableManualAccessibility = true
         return AppPreset(
             profile: p, kind: .aiAssistant, verification: .verified,
-            note: "Claude Code タブのメッセージ行（group/message-row）を訳します。ツール実行の状態行（group/status, group/tool）と読み上げ専用の重複テキスト（sr-only）は訳しません。チャットタブ向けの規則は未検証です。",
+            note: "Claude Code タブのメッセージ行（group/message-row）を、サイドチャットのものも含めて訳します。ツール実行の状態行（group/status, group/tool）と読み上げ専用の重複テキスト（sr-only）は訳しません。チャットタブ向けの規則は未検証です。",
             coveredTools: ["Claude Code"])
     }()
 

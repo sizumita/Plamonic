@@ -43,7 +43,7 @@ enum ProbePresets {
         Preset(name: "claude", bundleIDs: ["com.anthropic.claudefordesktop"]) { p in
             p.scope = .rules
             p.granularity = .paragraph
-            p.rules.containers = [m(dom: ["epitaxy-chat-panel-body"])]
+            p.rules.containers = [m(dom: ["epitaxy-chat-panel-body"]), m(dom: ["[scrollbar-gutter:stable_both-edges]"])]
             p.rules.items = [m(dom: ["group/message-row"])]
             p.rules.excludes = [
                 m(dom: ["group/status", "sr-only", "group/tool"]),

@@ -66,7 +66,10 @@ final class SettingsPresetsTests: XCTestCase {
 
         let claude = AppPresets.claude.profile.rules
         XCTAssertTrue(claude.items.contains { $0.domClassPrefixes.contains("group/message-row") })
-        XCTAssertEqual(claude.containers.flatMap(\.domClassPrefixes), ["epitaxy-chat-panel-body"])
+        // The chat panel and the side chat's transcript.
+        XCTAssertEqual(
+            claude.containers.flatMap(\.domClassPrefixes),
+            ["epitaxy-chat-panel-body", "[scrollbar-gutter:stable_both-edges]"])
         XCTAssertEqual(Set(claude.excludes.flatMap(\.domClassPrefixes)), ["group/status", "group/tool", "sr-only"])
 
         let openCode = AppPresets.openCodeDesktop.profile.rules
