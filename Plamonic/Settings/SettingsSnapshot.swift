@@ -161,7 +161,9 @@ enum SettingsNormalizer {
     ) -> ProgressiveTranslationSettings {
         var p = progressive
         if !isSmaller(p.draftModel, than: finalModel) {
-            p.draftModel = draftChoices(below: finalModel).last ?? ModelSize.allCases[0]
+            // the official model when two sizes share the largest rank
+            let choices = draftChoices(below: finalModel)
+            p.draftModel = choices.first { $0.rank == choices.last?.rank } ?? ModelSize.allCases[0]
         }
         p.burstControl.threshold = clamp(p.burstControl.threshold, SettingsLimits.burstThreshold)
         p.burstControl.quietSeconds = clamp(p.burstControl.quietSeconds, SettingsLimits.burstQuietSeconds)
@@ -193,8 +195,7 @@ enum SettingsNormalizer {
     }
 
     static func isSmaller(_ a: ModelSize, than b: ModelSize) -> Bool {
-        let order = ModelSize.allCases
-        return order.firstIndex(of: a)! < order.firstIndex(of: b)!
+        a.rank < b.rank
     }
 
     private static func clamp<T: Comparable>(_ value: T, _ range: ClosedRange<T>) -> T {

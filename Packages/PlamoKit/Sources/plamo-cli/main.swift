@@ -1,4 +1,6 @@
+import Darwin
 import Foundation
+import MLX
 import PlamoKit
 
 let usage = """
@@ -8,12 +10,12 @@ let usage = """
       tokenize  [-m <variant|path>] [--tokens] [text]          token ids for text (stdin if omitted)
       translate -m <variant|path> -t <lang> [--source <lang>] [--form plain|polite]
                 [--context <text>] [--max-tokens N] [--stream] [text]
-      bench     -m <variant|path> [--runs N]                   load time, prompt tok/s, gen tok/s
+      bench     -m <variant|path> [--runs N]                   load time, prompt tok/s, gen tok/s, memory
       download  <variant> [--root <dir>]                       download from Hugging Face
       verify    <variant> [--root <dir>]                       validate files and write .complete
       list      [--root <dir>]                                 installed variants
 
-    variants: 0.8b, 2b, 8b, 31b
+    variants: 0.8b, 0.8b-compact, 2b, 8b, 31b
     """
 
 struct CLIError: Error, CustomStringConvertible {
@@ -64,6 +66,8 @@ func store(_ args: Arguments) -> PlamoModelStore {
     return PlamoModelStore()
 }
 
+let variantNames = PlamoModelVariant.allCases.map(\.rawValue).joined(separator: "|")
+
 func variant(named name: String) -> PlamoModelVariant? {
     let lower = name.lowercased()
     return PlamoModelVariant.allCases.first { $0.rawValue == lower || $0.displayName.lowercased() == lower }
@@ -86,6 +90,24 @@ func modelDirectory(_ spec: String, store: PlamoModelStore) throws -> URL {
 
 func fmt(_ value: Double, _ digits: Int = 1) -> String {
     String(format: "%.\(digits)f", value)
+}
+
+/// The process's physical footprint (what Activity Monitor shows as Memory), in bytes.
+func physicalFootprint() -> Int {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+    let result = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+    return result == KERN_SUCCESS ? Int(info.phys_footprint) : 0
+}
+
+func memoryLine(_ label: String) -> String {
+    func mb(_ bytes: Int) -> String { fmt(Double(bytes) / 1_048_576) + " MB" }
+    return "memory \(label): MLX active \(mb(Memory.activeMemory)), MLX peak \(mb(Memory.peakMemory)), "
+        + "MLX cache \(mb(Memory.cacheMemory)), footprint \(mb(physicalFootprint()))"
 }
 
 func printError(_ message: String) {
@@ -164,6 +186,7 @@ func runBench(_ args: Arguments) async throws {
     let loadTime = try await engine.load(directory: dir)
     print("model: \(dir.lastPathComponent)")
     print("load: \(fmt(loadTime * 1000)) ms")
+    print(memoryLine("after load"))
 
     // Warm up kernels.
     _ = try await engine.translate(
@@ -217,11 +240,12 @@ func runBench(_ args: Arguments) async throws {
     print(
         "generation: \(generated) tokens, median \(fmt(genRates[genRates.count / 2])) tok/s, "
             + "best \(fmt(genRates.last!)) tok/s")
+    print(memoryLine("after runs"))
 }
 
 func runDownload(_ args: Arguments) async throws {
     guard let name = args.positional.first, let v = variant(named: name) else {
-        throw CLIError(description: "download <0.8b|2b|8b|31b>")
+        throw CLIError(description: "download <\(variantNames)>")
     }
     let s = store(args)
     print("downloading \(v.repoID) into \(s.directory(for: v).path)")
@@ -238,7 +262,7 @@ func runDownload(_ args: Arguments) async throws {
 
 func runVerify(_ args: Arguments) throws {
     guard let name = args.positional.first, let v = variant(named: name) else {
-        throw CLIError(description: "verify <0.8b|2b|8b|31b>")
+        throw CLIError(description: "verify <\(variantNames)>")
     }
     let s = store(args)
     if let problem = PlamoModelStore.validationProblem(directory: s.directory(for: v)) {
@@ -250,11 +274,12 @@ func runVerify(_ args: Arguments) throws {
 
 func runList(_ args: Arguments) {
     let s = store(args)
+    let width = PlamoModelVariant.allCases.map(\.rawValue.count).max() ?? 0
     for v in PlamoModelVariant.allCases {
         let installed = s.isInstalled(v)
         let size = s.installedBytes(v)
         print(
-            "\(v.displayName.padding(toLength: 5, withPad: " ", startingAt: 0)) "
+            "\(v.rawValue.padding(toLength: width, withPad: " ", startingAt: 0)) "
                 + (installed ? "installed" : "-        ") + "  \(fmt(Double(size) / 1e9, 2)) GB  \(s.directory(for: v).path)")
     }
 }

@@ -136,6 +136,69 @@ final class ModelLoaderTests: XCTestCase {
         assertInvalidModel(try Plamo3Configuration(json: config(["rope_scaling_factor": -1])), mentioning: "rope_scaling_factor")
     }
 
+    /// Conversions made with plain mlx-lm have rope_parameters instead of PFN's precomputed table.
+    func testRopeParametersReproducePFNTable() throws {
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "rope-inv-freq", withExtension: "json", subdirectory: "Fixtures"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let headDim = try XCTUnwrap(json["head_dim"] as? Int)
+        let table = try XCTUnwrap(json["plamo_rope_inv_freq"] as? [String: [NSNumber]])
+        let parameters = try XCTUnwrap(json["rope_parameters"] as? [String: Any])
+
+        for (kind, key) in [("full", "full_attention"), ("local", "sliding_attention")] {
+            let expected = try XCTUnwrap(table[kind]).map { Float($0.doubleValue) }
+            let computed = try Plamo3Configuration.ropeInvFreq(parameters[key], dim: headDim)
+            XCTAssertEqual(computed.count, expected.count)
+            for (i, (a, b)) in zip(computed, expected).enumerated() {
+                // within one float32 ulp
+                XCTAssertLessThanOrEqual(abs(a - b), b.ulp, "\(kind)[\(i)]: \(a) vs \(b)")
+            }
+        }
+    }
+
+    /// The shape of sizumita/plamo-3-translate-0.8b-mlx-4bit-compact: rope_parameters, and every
+    /// layer quantized, including embed_tokens and an untied lm_head.
+    func testFullyQuantizedModelWithRopeParametersLoads() throws {
+        var config = tinyConfig()
+        config["plamo_rope_inv_freq"] = nil
+        config["tie_word_embeddings"] = false
+        config["rope_scaling_factor"] = nil
+        config["quantization"] = ["group_size": 32, "bits": 4, "mode": "affine"]
+        config["rope_parameters"] = [
+            "full_attention": [
+                "rope_type": "yarn", "rope_theta": 1_000_000, "factor": 256.0,
+                "original_max_position_embeddings": 4096, "beta_fast": 32.0, "beta_slow": 1.0, "truncate": false,
+            ],
+            "sliding_attention": ["rope_type": "default", "rope_theta": 10000],
+        ]
+        let parsed = try Plamo3Configuration(json: config)
+        XCTAssertEqual(parsed.ropeInvFreqFull.count, 16)
+        XCTAssertEqual(parsed.ropeScalingFactor, 256)
+
+        let dir = try writeTinyModel(config: config)
+        var weights = try MLX.loadArrays(url: dir.appendingPathComponent("model.safetensors"))
+        eval(Array(weights.values))  // read everything before the file is overwritten
+        for path in ["model.embed_tokens", "lm_head"] {
+            let (wq, scales, biases) = MLX.quantized(
+                (MLXRandom.normal([16, 64]) * 0.02).asType(.bfloat16), groupSize: 32, bits: 4)
+            weights["\(path).weight"] = wq
+            weights["\(path).scales"] = scales
+            weights["\(path).biases"] = biases!
+        }
+        try MLX.save(arrays: weights, url: dir.appendingPathComponent("model.safetensors"))
+
+        let model = try withError { try PlamoModelLoader.load(directory: dir) }
+        let logits = try withError {
+            let out = model(MLXArray([Int32(1), 2, 3]).expandedDimensions(axis: 0), caches: model.makeCaches())
+            eval(out)
+            return out
+        }
+        XCTAssertEqual(logits.shape, [1, 3, 16])
+        XCTAssertEqual(logits.dtype, .float32)
+
+        config["rope_parameters"] = ["full_attention": ["rope_type": "longrope", "rope_theta": 10000]]
+        assertInvalidModel(try Plamo3Configuration(json: config), mentioning: "RoPE")
+    }
+
     /// The reported crash: real 0.8B weights with a config.json from another model.
     func testEngineRejectsMismatchedRealModel() async throws {
         guard let source = TestModels.directory(.b0_8) else { throw XCTSkip("PLaMo 0.8B is not installed") }

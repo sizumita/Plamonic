@@ -5,6 +5,8 @@ import Foundation
 
 enum ModelSize: String, Codable, CaseIterable, Identifiable, Sendable {
     case b0_8 = "0.8b"
+    /// An unofficial conversion of the 0.8B with every layer quantized: about half the memory.
+    case b0_8Compact = "0.8b-compact"
     case b2 = "2b"
     case b8 = "8b"
     case b31 = "31b"
@@ -14,18 +16,39 @@ enum ModelSize: String, Codable, CaseIterable, Identifiable, Sendable {
     var displayName: String {
         switch self {
         case .b0_8: "0.8B"
+        case .b0_8Compact: "0.8B 軽量版"
         case .b2: "2B"
         case .b8: "8B"
         case .b31: "31B"
         }
     }
 
-    var repoID: String { "pfnet/plamo-3-translate-\(rawValue)-MLX-4bit" }
+    var repoID: String {
+        switch self {
+        case .b0_8Compact: "sizumita/plamo-3-translate-0.8b-mlx-4bit-compact"
+        default: "pfnet/plamo-3-translate-\(rawValue)-MLX-4bit"
+        }
+    }
+
+    /// Published by PFN. The others are conversions by someone else.
+    var isOfficial: Bool { self != .b0_8Compact }
+
+    /// Parameter count order. Sizes of the same rank are the same model, so neither is smaller
+    /// than the other (段階翻訳 needs a smaller draft model).
+    var rank: Int {
+        switch self {
+        case .b0_8, .b0_8Compact: 0
+        case .b2: 1
+        case .b8: 2
+        case .b31: 3
+        }
+    }
 
     /// Approximate download size of the MLX-4bit weights.
     var approxDownloadGB: Double {
         switch self {
         case .b0_8: 0.98
+        case .b0_8Compact: 0.51
         case .b2: 2.41
         case .b8: 6.07
         case .b31: 18.66
@@ -35,7 +58,7 @@ enum ModelSize: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Rough unified memory recommended to run this size comfortably.
     var recommendedMemoryGB: Int {
         switch self {
-        case .b0_8: 8
+        case .b0_8, .b0_8Compact: 8
         case .b2: 8
         case .b8: 16
         case .b31: 48

@@ -19,7 +19,10 @@ let package = Package(
                 .product(name: "MLXNN", package: "mlx-swift"),
             ]
         ),
-        .executableTarget(name: "plamo-cli", dependencies: ["PlamoKit"]),
+        .executableTarget(
+            name: "plamo-cli",
+            dependencies: ["PlamoKit", .product(name: "MLX", package: "mlx-swift")]
+        ),
         .testTarget(
             name: "PlamoKitTests",
             dependencies: ["PlamoKit"],

@@ -37,9 +37,17 @@ plamo-cli               コマンドラインツール（tokenize / translate / 
 ## 2. PLaMo 3 Translate（MLX）
 
 - リポジトリ: `pfnet/plamo-3-translate-{0.8b,2b,8b,31b}-MLX-4bit`。サイズはおよそ 0.98 / 2.41 / 6.07 / 18.66 GB。
+- 0.8B 軽量版: `sizumita/plamo-3-translate-0.8b-mlx-4bit-compact`（約 0.5 GB）。PFN の 0.8B（BF16）を mlx-lm 0.32.2 で
+  全層 4bit（group 64）に変換した非公式の派生モデル。公式版との違いは `embed_tokens` と `lm_head` も量子化していること
+  （スケールは BF16）と、`config.json` に `plamo_rope_inv_freq` がなく Hugging Face 形式の `rope_parameters` を持つこと。
+  `plamo_rope_inv_freq` がないときは `rope_parameters`（`full_attention` は yarn、`sliding_attention` は default）から
+  transformers と同じ式を float32 で計算する（公式の表と 1 ulp 以内で一致）。
+  M4 での実測（`plamo-cli bench`）: 重み 964 → 478 MB、読み込み直後のプロセス 1,164 → 632 MB、
+  446 トークンの入力でのピーク 1,781 → 1,056 MB。参考訳 8 件のうち 6 件が公式版と同じ訳、2 件は言い回しだけ違う。
+  モデルの大きさは 0.8B と同じなので、段階翻訳ではどちらも相手より小さいとは扱わない（`ModelSize.rank`）。
 - 必要ファイル: `config.json`, `tokenizer.jsonl`, `tokenizer_config.json`, `special_tokens_map.json`,
   `generation_config.json`, `model.safetensors` または `model-0000N-of-0000M.safetensors` + `model.safetensors.index.json`。
-- 保存先: `~/Library/Application Support/Plamonic/Models/pfnet/<repo名>/`（ダウンロード完了時に `.complete` を置く）。
+- 保存先: `~/Library/Application Support/Plamonic/Models/<リポジトリ>/`（例: `pfnet/plamo-3-translate-2b-MLX-4bit/`）（ダウンロード完了時に `.complete` を置く）。
 - ダウンロード: 隣の `.<repo名>.partial/` に集め、検証が済んだファイルは `.downloaded.json`（パス → oid）に記録する。
   一時的なネットワークエラー（接続断・タイムアウト・HTTP 5xx / 429・サイズ不一致）はファイルごとに 2 / 5 / 10 秒後に再試行する。
   それでも失敗したら `.partial` を残し、次のダウンロードは oid とサイズ（safetensors はヘッダも）が一覧と一致するファイルを
@@ -99,7 +107,7 @@ plamo-cli               コマンドラインツール（tokenize / translate / 
 | 翻訳元言語 | 自動判定 or 固定 |
 | 文体 | 日本語出力時: 自動 / 常体 / 敬体 |
 | 同じ言語のテキスト | スキップ / 翻訳する（やさしい日本語化や文体統一に使う） |
-| 翻訳モデル（仕上げ） | 0.8B / 2B / 8B / 31B。訳文の完成形を出すモデル（段階翻訳がオフならこれだけを使う） |
+| 翻訳モデル（仕上げ） | 0.8B / 0.8B 軽量版 / 2B / 8B / 31B。訳文の完成形を出すモデル（段階翻訳がオフならこれだけを使う） |
 | 段階翻訳 | オン/オフ、下書きモデル（翻訳モデルより小さいもの）、混雑時の一時停止（しきい値・再開までの静かな時間）。5 章 |
 | 切替後も翻訳を続ける | 前面でなくなったアプリのウインドウも監視・表示し続けるか |
 | 未登録アプリの既定動作 | オフ / 自動 / 手動 |

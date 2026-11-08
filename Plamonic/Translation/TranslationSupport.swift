@@ -43,8 +43,7 @@ struct TranslationModelPlan: Equatable, Sendable {
     }
 
     private static func isSmaller(_ a: ModelSize, than b: ModelSize) -> Bool {
-        let order = ModelSize.allCases
-        return order.firstIndex(of: a)! < order.firstIndex(of: b)!
+        a.rank < b.rank
     }
 
     /// User-facing explanation when the configured models cannot all be used (Japanese).

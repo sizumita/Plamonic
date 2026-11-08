@@ -1,18 +1,27 @@
 import Foundation
 
-/// PLaMo 3 Translate MLX-4bit model sizes published by PFN.
+/// PLaMo 3 Translate MLX-4bit models: the sizes published by PFN, plus a compact 0.8B.
 public enum PlamoModelVariant: String, CaseIterable, Sendable, Codable, Hashable {
     case b0_8 = "0.8b"
+    /// An unofficial mlx-lm conversion of the 0.8B that also quantizes embed_tokens and lm_head:
+    /// about half the memory of `b0_8`, with nearly the same translations.
+    case b0_8Compact = "0.8b-compact"
     case b2 = "2b"
     case b8 = "8b"
     case b31 = "31b"
 
     /// Hugging Face repository, e.g. `pfnet/plamo-3-translate-2b-MLX-4bit`.
-    public var repoID: String { "pfnet/plamo-3-translate-\(rawValue)-MLX-4bit" }
+    public var repoID: String {
+        switch self {
+        case .b0_8Compact: "sizumita/plamo-3-translate-0.8b-mlx-4bit-compact"
+        default: "pfnet/plamo-3-translate-\(rawValue)-MLX-4bit"
+        }
+    }
 
     public var displayName: String {
         switch self {
         case .b0_8: "0.8B"
+        case .b0_8Compact: "0.8B 軽量版"
         case .b2: "2B"
         case .b8: "8B"
         case .b31: "31B"
@@ -23,6 +32,7 @@ public enum PlamoModelVariant: String, CaseIterable, Sendable, Codable, Hashable
     public var approximateDownloadBytes: Int64 {
         switch self {
         case .b0_8: 980_000_000
+        case .b0_8Compact: 505_000_000
         case .b2: 2_415_000_000
         case .b8: 6_070_000_000
         case .b31: 18_660_000_000

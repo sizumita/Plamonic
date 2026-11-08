@@ -103,7 +103,7 @@ The [user guide](docs/USAGE.ja.md) (Japanese) explains every setting and what to
 ## Requirements
 
 - macOS 15 or later, on Apple silicon (M1 or later).
-- Memory: 8 GB for the 0.8B and 2B models, 16 GB for 8B, 48 GB for 31B.
+- Memory: 8 GB for the 0.8B, compact 0.8B and 2B models, 16 GB for 8B, 48 GB for 31B.
 - Disk: about 3.4 GB for the default models (2B, with 0.8B for drafts).
 
 ## Privacy

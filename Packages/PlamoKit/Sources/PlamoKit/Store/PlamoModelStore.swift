@@ -14,7 +14,7 @@ public struct PlamoDownloadProgress: Sendable, Hashable {
 
 /// Where PLaMo models live on disk, and how they get there.
 ///
-/// Layout: `<root>/pfnet/plamo-3-translate-<size>-MLX-4bit/`. A finished download contains a
+/// Layout: `<root>/<Hugging Face repository>/`, e.g. `<root>/pfnet/plamo-3-translate-2b-MLX-4bit/`. A finished download contains a
 /// `.complete` marker; directories placed by hand are accepted when their files look complete.
 public final class PlamoModelStore: Sendable {
     public static let completeMarkerName = ".complete"
@@ -90,7 +90,7 @@ public final class PlamoModelStore: Sendable {
         guard size("tokenizer_config.json") != nil else { return "tokenizer_config.json がありません" }
         guard let data = try? Data(contentsOf: directory.appendingPathComponent("config.json")),
             let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            json["plamo_rope_inv_freq"] != nil
+            json["plamo_rope_inv_freq"] != nil || json["rope_parameters"] != nil
         else {
             return "config.json が不正です"
         }
