@@ -51,7 +51,7 @@ struct ModelSettingsPane: View {
             }
 
             Section("ライセンス") {
-                Text("PLaMo 3 Translate のモデルは Preferred Networks が PLaMo Community License のもとで公開しています。ダウンロードして使う前にライセンスを確認してください。商用で利用する場合は Preferred Networks への登録が必要です。")
+                Text("PLaMo 3 Translate のモデルは Preferred Networks が PLaMo Community License のもとで公開しています。0.8B 軽量版は、0.8B をもとに sizumita が作って公開している非公式の派生モデルで、同じライセンスに従います。ダウンロードして使う前にライセンスを確認してください。商用で利用する場合は Preferred Networks への登録が必要です。")
                     .fixedSize(horizontal: false, vertical: true)
                 PlamoLicenseButton()
                 Text("Built with PLaMo")
@@ -224,6 +224,11 @@ private struct ModelRow: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if !size.isOfficial {
+                    Text("0.8B の全層を 4bit にした非公式版です。使うメモリは約半分で、訳は 0.8B とほぼ同じです。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if SettingsFormat.physicalMemoryGB < size.recommendedMemoryGB {
                     Text("このMacのメモリでは重くなる可能性があります。")
                         .font(.caption)

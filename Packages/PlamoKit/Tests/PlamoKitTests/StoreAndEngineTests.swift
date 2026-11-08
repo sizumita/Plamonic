@@ -17,6 +17,7 @@ final class ModelStoreTests: XCTestCase {
 
     func testVariantNaming() {
         XCTAssertEqual(PlamoModelVariant.b2.repoID, "pfnet/plamo-3-translate-2b-MLX-4bit")
+        XCTAssertEqual(PlamoModelVariant.b0_8Compact.repoID, "sizumita/plamo-3-translate-0.8b-mlx-4bit-compact")
         XCTAssertEqual(PlamoModelVariant.b0_8.displayName, "0.8B")
         let store = PlamoModelStore(rootDirectory: root)
         XCTAssertEqual(
@@ -107,6 +108,12 @@ final class ModelStoreTests: XCTestCase {
             XCTAssertNotNil(PlamoModelStore.validationProblem(directory: dir), shard)
             XCTAssertThrowsError(try PlamoModelLoader.weightFiles(in: dir), shard)
         }
+
+        // mlx-lm conversions keep rope_parameters instead of plamo_rope_inv_freq
+        try writeIndex("model-1.safetensors")
+        let mlxLMConfig = ["rope_parameters": [:] as [String: Any], "pad": String(repeating: "x", count: 600)] as [String: Any]
+        try JSONSerialization.data(withJSONObject: mlxLMConfig).write(to: dir.appendingPathComponent("config.json"))
+        XCTAssertNil(PlamoModelStore.validationProblem(directory: dir))
     }
 
     func testPartialDownloadKeepsOnlyFinishedFiles() throws {

@@ -1,3 +1,4 @@
+import PlamoKit
 import XCTest
 
 @testable import Plamonic
@@ -180,6 +181,46 @@ final class SettingsProgressiveTests: XCTestCase {
         store.updateGlobal { $0.finalModel = .b8 }
         XCTAssertEqual(store.global.progressive.draftModel, .b0_8, "two-stage again once the final model grows")
         XCTAssertEqual(store.global.draftModel, .b0_8)
+    }
+
+    /// The compact 0.8B is the same model as the 0.8B: neither can be the other's draft.
+    func testCompactModelRanksWithTheOfficialSize() {
+        func draft(_ draft: ModelSize, final: ModelSize) -> ModelSize {
+            var g = GlobalSettings()
+            g.finalModel = final
+            g.progressive.draftModel = draft
+            return SettingsNormalizer.normalized(g).progressive.draftModel
+        }
+        XCTAssertFalse(SettingsNormalizer.isSmaller(.b0_8Compact, than: .b0_8))
+        XCTAssertFalse(SettingsNormalizer.isSmaller(.b0_8, than: .b0_8Compact))
+        XCTAssertEqual(SettingsNormalizer.draftChoices(below: .b2), [.b0_8, .b0_8Compact])
+        XCTAssertEqual(SettingsNormalizer.draftChoices(below: .b0_8Compact), [])
+        XCTAssertEqual(draft(.b0_8Compact, final: .b2), .b0_8Compact, "a smaller draft is kept")
+        XCTAssertEqual(draft(.b8, final: .b2), .b0_8, "the official model when both rank the same")
+
+        var g = GlobalSettings()
+        g.finalModel = .b0_8Compact
+        g = SettingsNormalizer.normalized(g)
+        XCTAssertEqual(ProgressiveStatus.issue(global: g, isInstalled: { _ in true }), .finalIsSmallest(final: .b0_8Compact))
+        let single = TranslationModelPlan.make(global: g, isInstalled: { _ in true })
+        XCTAssertNil(single.draft)
+        XCTAssertEqual(single.final, .b0_8Compact)
+
+        g.finalModel = .b2
+        g.progressive.draftModel = .b0_8Compact
+        let twoStage = TranslationModelPlan.make(global: g, isInstalled: { _ in true })
+        XCTAssertEqual(twoStage.draft, .b0_8Compact)
+        XCTAssertEqual(twoStage.final, .b2)
+    }
+
+    func testEveryModelSizeMapsToAPlamoVariant() {
+        for size in ModelSize.allCases {
+            let variant = PlamoBackend.variant(size)
+            XCTAssertEqual(variant.rawValue, size.rawValue)
+            XCTAssertEqual(variant.repoID, size.repoID)
+            XCTAssertEqual(variant.displayName, size.displayName)
+            XCTAssertEqual(PlamoBackend.size(variant), size)
+        }
     }
 
     // MARK: - Per-app override

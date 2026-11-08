@@ -84,14 +84,24 @@ struct Plamo3Configuration: Sendable {
         intermediateSize = try int("intermediate_size")
         vocabSize = try int("vocab_size")
 
-        guard let inv = json["plamo_rope_inv_freq"] as? [String: Any],
+        if let inv = json["plamo_rope_inv_freq"] as? [String: Any],
             let full = inv["full"] as? [NSNumber], let local = inv["local"] as? [NSNumber]
-        else {
+        {
+            // values are FP32-exact; go through Double like Python's mx.array(list, dtype=float32)
+            ropeInvFreqFull = full.map { Float($0.doubleValue) }
+            ropeInvFreqLocal = local.map { Float($0.doubleValue) }
+        } else if let parameters = json["rope_parameters"] as? [String: Any] {
+            // Conversions made with plain mlx-lm keep the Hugging Face rope_parameters instead.
+            ropeInvFreqFull = try Self.ropeInvFreq(parameters["full_attention"], dim: headDim)
+            ropeInvFreqLocal = try Self.ropeInvFreq(parameters["sliding_attention"], dim: headDim)
+            if ropeScalingFactor == nil,
+                let full = parameters["full_attention"] as? [String: Any], full["rope_type"] as? String == "yarn"
+            {
+                ropeScalingFactor = (full["factor"] as? NSNumber)?.doubleValue
+            }
+        } else {
             throw PlamoError.invalidModel("config.json に plamo_rope_inv_freq がありません。モデルを再ダウンロードしてください")
         }
-        // values are FP32-exact; go through Double like Python's mx.array(list, dtype=float32)
-        ropeInvFreqFull = full.map { Float($0.doubleValue) }
-        ropeInvFreqLocal = local.map { Float($0.doubleValue) }
         guard ropeInvFreqFull.count == headDim / 2, ropeInvFreqLocal.count == headDim / 2 else {
             throw PlamoError.invalidModel("RoPE の次元が不正です")
         }
@@ -119,6 +129,60 @@ struct Plamo3Configuration: Sendable {
             }
         }
         try validate()
+    }
+
+    /// Inverse RoPE frequencies for one `rope_parameters` entry, computed in float32 like
+    /// transformers' `_compute_default_rope_parameters` and `_compute_yarn_parameters`. For the
+    /// PFN checkpoints this reproduces `plamo_rope_inv_freq` to within one float32 ulp.
+    static func ropeInvFreq(_ entry: Any?, dim: Int) throws -> [Float] {
+        guard let entry = entry as? [String: Any], let theta = (entry["rope_theta"] as? NSNumber)?.doubleValue,
+            theta.isFinite, theta > 1, dim >= 2, dim % 2 == 0
+        else {
+            throw PlamoError.invalidModel("config.json の rope_parameters が不正です")
+        }
+        let base = Float(theta)
+        let half = dim / 2
+        let posFreqs = (0 ..< half).map { pow(base, Float(2 * $0) / Float(dim)) }
+        let type = entry["rope_type"] as? String ?? "default"
+        switch type {
+        case "default":
+            return posFreqs.map { 1 / $0 }
+        case "yarn":
+            func number(_ key: String, _ fallback: Double? = nil) throws -> Double {
+                if let v = (entry[key] as? NSNumber)?.doubleValue, v.isFinite { return v }
+                if let fallback { return fallback }
+                throw PlamoError.invalidModel("config.json の rope_parameters に \(key) がありません")
+            }
+            let factor = try number("factor")
+            let original = try number("original_max_position_embeddings")
+            let betaFast = try number("beta_fast", 32)
+            let betaSlow = try number("beta_slow", 1)
+            let truncate = (entry["truncate"] as? NSNumber)?.boolValue ?? true
+            guard factor > 0, original > 0, betaFast > 0, betaSlow > 0 else {
+                throw PlamoError.invalidModel("config.json の rope_parameters が不正です")
+            }
+            func correctionDim(_ rotations: Double) -> Double {
+                Double(dim) * log(original / (rotations * 2 * Double.pi)) / (2 * log(theta))
+            }
+            var low = correctionDim(betaFast)
+            var high = correctionDim(betaSlow)
+            if truncate {
+                low = low.rounded(.down)
+                high = high.rounded(.up)
+            }
+            low = max(low, 0)
+            high = min(high, Double(dim - 1))
+            if low == high { high += 0.001 }
+            let (lowF, spanF, factorF) = (Float(low), Float(high - low), Float(factor))
+            return posFreqs.enumerated().map { i, freq in
+                let ramp = min(max((Float(i) - lowF) / spanF, 0), 1)
+                let extrapolation = 1 - ramp
+                let interpolated = 1 / (factorF * freq)
+                return interpolated * (1 - extrapolation) + (1 / freq) * extrapolation
+            }
+        default:
+            throw PlamoError.invalidModel("未対応の RoPE: \(type)")
+        }
     }
 
     /// Rejects values that would trap (division by zero, invalid ranges) or that MLX cannot run.

@@ -26,7 +26,11 @@ The exact versions of the Swift packages are pinned in `Packages/PlamoKit/Packag
 The models are not included in this repository or in the app. Plamonic downloads the model you choose from Hugging
 Face (`pfnet/plamo-3-translate-<size>-MLX-4bit`, for example
 [pfnet/plamo-3-translate-2b-MLX-4bit](https://huggingface.co/pfnet/plamo-3-translate-2b-MLX-4bit)) into
-`~/Library/Application Support/Plamonic/Models`.
+`~/Library/Application Support/Plamonic/Models`. The compact 0.8B choice comes from
+[sizumita/plamo-3-translate-0.8b-mlx-4bit-compact](https://huggingface.co/sizumita/plamo-3-translate-0.8b-mlx-4bit-compact),
+an unofficial conversion of
+[pfnet/plamo-3-translate-0.8b](https://huggingface.co/pfnet/plamo-3-translate-0.8b) with mlx-lm; it is a derived model
+under the same license and is not affiliated with or endorsed by PFN.
 
 Preferred Networks, Inc. (PFN) publishes the models under the PLaMo Community License
 ([English](https://plamo.preferredai.jp/info/plamo-community-license-en),
