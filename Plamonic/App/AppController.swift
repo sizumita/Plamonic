@@ -18,6 +18,8 @@ final class AppController: ObservableObject {
     /// Sparkle updates (started only in builds that carry its public key).
     let updates: UpdateController
     let inspector = AXInspector()
+    /// Answers the Safari and Chrome extensions (DESIGN §9).
+    let bridge: BridgeService
     /// Matches overlay colors to the target window (only with Screen Recording permission).
     let colorSampler = ScreenColorSampler()
 
@@ -39,6 +41,7 @@ final class AppController: ObservableObject {
     private var trustTimer: Timer?
     private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
+    private var bridgeServer: BridgeSocketServer?
     private let log = Logger(subsystem: "io.smdr.Plamonic", category: "App")
 
     init() {
@@ -63,6 +66,11 @@ final class AppController: ObservableObject {
         self.overlay = overlay
         self.session = session
         self.updates = UpdateController(settings: settings)
+        self.bridge = BridgeService(
+            coordinator: coordinator,
+            globalSettings: { settings.global },
+            isReady: { TranslationModelPlan.make(settings: $0) { backend.isModelInstalled($0) }.hasModel },
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
         overlay.colorSampler = colorSampler
 
         coordinator.onActivityChanged = { [weak self] activity in self?.activity = activity }
@@ -110,6 +118,8 @@ final class AppController: ObservableObject {
     func shutdown() {
         trustTimer?.invalidate()
         trustTimer = nil
+        bridgeServer?.stop()
+        bridgeServer = nil
         session.stop()
         overlay.removeAll()
         HotkeyCenter.shared.unregisterAll()
@@ -201,6 +211,31 @@ final class AppController: ObservableObject {
         }
         if previous?.isEnabled == true, !global.isEnabled {
             coordinator.cancelAll()
+        }
+        if force || previous?.acceptBrowserExtensions != global.acceptBrowserExtensions {
+            setBridgeRunning(global.acceptBrowserExtensions)
+        }
+    }
+
+    /// Listens on the bridge socket only while the extensions are allowed; turning it off also forgets their
+    /// documents.
+    private func setBridgeRunning(_ running: Bool) {
+        if running {
+            guard bridgeServer == nil else { return }
+            let bridge = self.bridge
+            let server = BridgeSocketServer(path: BridgeLocation.socketURL().path) { line in
+                await bridge.handle(line: line)
+            }
+            do {
+                try server.start()
+                bridgeServer = server
+            } catch {
+                log.error("Bridge failed to start: \(String(describing: error), privacy: .public)")
+            }
+        } else {
+            bridgeServer?.stop()
+            bridgeServer = nil
+            coordinator.closeAllDocuments()
         }
     }
 

@@ -44,6 +44,14 @@ struct GeneralSettingsPane: View {
                 Text(Self.passwordPauseDescription)
             }
 
+            Section {
+                Toggle("ブラウザの拡張機能に翻訳を提供する", isOn: $store.global.acceptBrowserExtensions)
+            } header: {
+                Text("ブラウザ")
+            } footer: {
+                Text("Safari と Chrome の Plamonic 拡張機能が、YouTube の字幕などをこの Mac で翻訳できるようにします。")
+            }
+
             Section("アクセシビリティ") {
                 LabeledContent("画面のテキストの読み取り") {
                     if accessibilityTrusted {

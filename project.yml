@@ -67,6 +67,9 @@ targets:
       path: Plamonic/Resources/Plamonic.entitlements
       properties:
         com.apple.security.app-sandbox: false
+        # The bridge socket for the browser extensions lives in this group's container, which the sandboxed
+        # Safari extension can reach (DESIGN §8). Builds signed by another team fall back to Application Support.
+        com.apple.security.application-groups: [NBDP5VK335.io.smdr.Plamonic]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.smdr.Plamonic

@@ -79,6 +79,9 @@ final class TranslationCoordinator {
     /// Displayed translations of texts with links, so redraws do not map them again.
     private var linkMaps: [LinkMapKey: TranslationLinks.Mapped] = [:]
     private var installCache: [ModelSize: (installed: Bool, checkedAt: Date)] = [:]
+    /// Texts sent by browser extensions (one video's captions each), see "Browser extension documents".
+    private var documents: [ExternalDocumentKey: ExternalDocument] = [:]
+    private var documentCounter = 0
 
     init(
         backend: any TranslationBackend,
@@ -169,7 +172,8 @@ final class TranslationCoordinator {
     }
 
     /// Stops all work: windows are forgotten, the running call is cancelled and waiting
-    /// `translateOnce` calls return nil. Cached translations are kept.
+    /// `translateOnce` calls return nil. Cached translations are kept, and so are browser extension documents
+    /// (they do not depend on 翻訳を有効にする; the next `sync` resumes their work).
     func cancelAll() {
         windows.removeAll()
         for id in manualQueue { manualWaiters.removeValue(forKey: id)?.continuation.resume(returning: nil) }
@@ -518,10 +522,12 @@ final class TranslationCoordinator {
     }
 
     private func nextJob() -> Job? {
-        guard !windows.isEmpty else { return nil }
         let now = Date()
         let ordered = orderedWindows()
+        let documents = orderedDocuments()
 
+        // Captions about to be shown come before everything but manual requests: they cannot wait.
+        if let job = urgentDocumentJob(documents, now: now) { return job }
         if let job = firstStageJob(windows: ordered, now: now) { return job }
         for window in ordered {
             // 混雑時の一時停止: while new text keeps flooding into this app, its drafts go first and its upgrades wait.
@@ -533,7 +539,8 @@ final class TranslationCoordinator {
                 return makeJob(entry, index: index, window: window, model: final)
             }
         }
-        return nil
+        // Reading ahead in a document only uses time nothing on screen needs.
+        return prefetchDocumentJob(documents, now: now)
     }
 
     /// The first translation of a text that has none: the window's draft model, its final model when it
@@ -580,8 +587,10 @@ final class TranslationCoordinator {
 
     /// Whether `nextJob()` would pick a first-stage job now.
     private func hasFirstStageJob() -> Bool {
+        let now = Date()
+        if urgentDocumentJob(Array(documents.values), now: now) != nil { return true }
         guard !windows.isEmpty else { return false }
-        return firstStageJob(windows: Array(windows.values), now: Date()) != nil
+        return firstStageJob(windows: Array(windows.values), now: now) != nil
     }
 
     private func orderedWindows() -> [WindowState] {
@@ -778,7 +787,9 @@ final class TranslationCoordinator {
     private func cancelRunningJobIfStale() {
         guard let running, running.job.manualID == nil, !running.cancelled else { return }
         let subject = running.job.id.subject
-        guard !windows.values.contains(where: { $0.knows(subject) }) else { return }
+        guard !windows.values.contains(where: { $0.knows(subject) }),
+            !documents.values.contains(where: { $0.subjects.contains(subject) })
+        else { return }
         running.cancelled = true
         running.task?.cancel()
     }
@@ -837,7 +848,7 @@ final class TranslationCoordinator {
 
     private func pruneFailures() {
         guard failures.count > 256 else { return }
-        let live = windows.values.reduce(into: Set<TranslationSubject>()) { $0.formUnion($1.subjects) }
+        let live = liveSubjects()
         failures = failures.filter { live.contains($0.key.subject) }
     }
 
@@ -852,6 +863,10 @@ final class TranslationCoordinator {
                 live.insert(JobID(subject: subject, model: final))
             }
         }
+        for document in documents.values {
+            guard let final = document.plan.final else { continue }
+            for subject in document.subjects { live.insert(JobID(subject: subject, model: final)) }
+        }
         resumableChunks = resumableChunks.filter { live.contains($0.key) }
     }
 
@@ -859,7 +874,7 @@ final class TranslationCoordinator {
     /// as pending) even if no new scan arrives.
     private func scheduleWakeIfNeeded() {
         let now = Date()
-        let live = windows.values.reduce(into: Set<TranslationSubject>()) { $0.formUnion($1.subjects) }
+        let live = liveSubjects()
         let earliest = failures.compactMap { id, record -> Date? in
             guard let until = record.blockedUntil, until > now, live.contains(id.subject) else { return nil }
             return until
@@ -997,6 +1012,7 @@ final class TranslationCoordinator {
     func applyCacheSettings(_ global: GlobalSettings) {
         // Subjects shared by several windows count more than once; a slightly larger cache is harmless.
         let live = windows.values.reduce(0) { $0 + $1.subjects.count }
+            + documents.values.reduce(0) { $0 + $1.subjects.count }
         let wanted = max(1, global.cacheCapacity, 2 * live + 256)
         if cache.capacity != wanted { cache.capacity = wanted }
         if cache.isPersistenceEnabled != (global.persistCache && cache.fileURL != nil) {
@@ -1045,6 +1061,272 @@ final class TranslationCoordinator {
                 }
             }
         }
+        for document in documents.values where document.plan.hasModel {
+            for entry in document.entries[document.focus...] {
+                guard let subject = entry.subject, seen.insert(subject).inserted else { continue }
+                if !hasAnyTranslation(subject) { count += 1 }
+            }
+        }
         return count
+    }
+}
+
+// MARK: - Browser extension documents
+
+/// Texts sent by a browser extension, such as one video's captions in time order. The extension sends the whole
+/// list once and then keeps moving `focus` (what is being shown); jobs are picked from the latest state like a
+/// window's. The texts from the focus through `urgentCount` are translated before anything but manual requests;
+/// the rest is read ahead only when nothing on screen waits. Results are polled (`documentResults`).
+extension TranslationCoordinator {
+    struct ExternalDocumentKey: Hashable, Sendable {
+        /// Who sent it, such as "chrome" or "safari".
+        var client: String
+        var id: String
+    }
+
+    struct ExternalItem: Equatable, Sendable {
+        var id: String
+        var text: String
+    }
+
+    struct ExternalResult: Equatable, Sendable {
+        enum State: String, Sendable {
+            case pending, draft, final, failed
+            /// Not translated: empty, filtered out, or already in the target language.
+            case skipped
+        }
+
+        var id: String
+        var state: State
+        /// Empty unless the state is draft or final.
+        var translation: String
+    }
+
+    struct ExternalProgress: Equatable, Sendable {
+        /// Texts from the focus on that have a translation (or need none).
+        var done: Int
+        var total: Int
+    }
+
+    fileprivate struct ExternalEntry {
+        var id: String
+        var original: String
+        /// nil = skipped.
+        var subject: TranslationSubject?
+        var glossary: [GlossaryTerm]
+    }
+
+    fileprivate struct ExternalDocument {
+        var key: ExternalDocumentKey
+        var settings: EffectiveSettings
+        var plan: TranslationModelPlan
+        var entries: [ExternalEntry]
+        var indexByID: [String: Int]
+        var subjects: Set<TranslationSubject>
+        var focus: Int
+        var urgentCount: Int
+        /// Last time the extension asked about it; documents left alone expire.
+        var lastUsed: Date
+        /// Higher = updated more recently; goes first among documents.
+        var sequence: Int
+
+        var urgentRange: Range<Int> { focus..<min(entries.count, focus + max(0, urgentCount)) }
+    }
+
+    /// Creates or replaces the document's texts (when `items` is given) and moves its focus to the item `focus`
+    /// (the first item when nil or unknown). Returns false when the document is unknown and `items` is nil: the
+    /// extension must send the texts again (the app restarted, or the document expired).
+    @discardableResult
+    func updateDocument(
+        _ key: ExternalDocumentKey, items: [ExternalItem]?, focus: String?, urgentCount: Int,
+        settings: EffectiveSettings
+    ) -> Bool {
+        let now = Date()
+        pruneDocuments(now: now)
+        documentCounter += 1
+        var document: ExternalDocument
+        if let items {
+            let previous = documents[key]
+            if let previous, previous.settings == settings, previous.entries.map(\.original) == items.map(\.text),
+                previous.entries.map(\.id) == items.map(\.id)
+            {
+                document = previous
+            } else {
+                document = makeDocument(key, items: items, settings: settings)
+            }
+        } else if let existing = documents[key] {
+            document = existing
+            if existing.settings != settings { document = makeDocument(key, items: existing.items, settings: settings) }
+        } else {
+            return false
+        }
+        document.focus = focus.flatMap { document.indexByID[$0] } ?? 0
+        document.urgentCount = urgentCount
+        document.lastUsed = now
+        document.sequence = documentCounter
+        documents[key] = document
+        lastPlan = document.plan
+        applyCacheSettings(settings.global)
+        cancelRunningJobIfStale()
+        pruneResumableChunks()
+        pump()
+        return true
+    }
+
+    /// The current state of the given items (all items when `ids` is nil), or nil for an unknown document.
+    func documentResults(_ key: ExternalDocumentKey, ids: [String]? = nil) -> [ExternalResult]? {
+        guard var document = documents[key] else { return nil }
+        document.lastUsed = Date()
+        documents[key] = document
+        let now = Date()
+        let indices = ids.map { $0.compactMap { document.indexByID[$0] } } ?? Array(document.entries.indices)
+        return indices.map { result(for: document.entries[$0], in: document, now: now) }
+    }
+
+    func documentProgress(_ key: ExternalDocumentKey) -> ExternalProgress? {
+        guard let document = documents[key] else { return nil }
+        let now = Date()
+        let ahead = document.entries[document.focus...]
+        let done = ahead.filter { result(for: $0, in: document, now: now).state != .pending }.count
+        return ExternalProgress(done: done, total: ahead.count)
+    }
+
+    /// The extension is done with it (tab closed, another video). Its pending jobs disappear with it.
+    func closeDocument(_ key: ExternalDocumentKey) {
+        guard documents.removeValue(forKey: key) != nil else { return }
+        cancelRunningJobIfStale()
+        pruneResumableChunks()
+        pump()
+    }
+
+    fileprivate var documentKeys: Dictionary<ExternalDocumentKey, ExternalDocument>.Keys { documents.keys }
+
+    // MARK: Documents, private
+
+    fileprivate static let documentLifetime: TimeInterval = 300
+
+    private func makeDocument(
+        _ key: ExternalDocumentKey, items: [ExternalItem], settings: EffectiveSettings
+    ) -> ExternalDocument {
+        let glossary = TranslationRequestFactory.sanitizedGlossary(settings.glossary)
+        var entries: [ExternalEntry] = []
+        var indexByID: [String: Int] = [:]
+        var subjects = Set<TranslationSubject>()
+        for item in items where indexByID[item.id] == nil {
+            let normalized = TextSanitizer.normalize(item.text, maxLength: configuration.manualTextCharacterLimit)
+            var entry = ExternalEntry(id: item.id, original: item.text, subject: nil, glossary: [])
+            if !normalized.isEmpty, accepts(normalized, settings: settings, regexes: [], kanaNearby: false) {
+                let (subject, terms) = makeSubject(normalized, settings: settings, sanitizedGlossary: glossary)
+                entry.subject = subject
+                entry.glossary = terms
+                subjects.insert(subject)
+            }
+            indexByID[item.id] = entries.count
+            entries.append(entry)
+        }
+        return ExternalDocument(
+            key: key, settings: settings, plan: makePlan(settings), entries: entries, indexByID: indexByID,
+            subjects: subjects, focus: 0, urgentCount: 0, lastUsed: Date(), sequence: documentCounter)
+    }
+
+    private func result(for entry: ExternalEntry, in document: ExternalDocument, now: Date) -> ExternalResult {
+        guard let subject = entry.subject else { return ExternalResult(id: entry.id, state: .skipped, translation: "") }
+        let settings = document.settings
+        if let best = cache.best(for: subject, finalModel: settings.global.finalModel, draftModel: settings.draftModel) {
+            return ExternalResult(id: entry.id, state: best.isFinal ? .final : .draft, translation: best.translation)
+        }
+        let failed = isFailed(subject, plan: document.plan, now: now)
+        return ExternalResult(id: entry.id, state: failed ? .failed : .pending, translation: "")
+    }
+
+    private func pruneDocuments(now: Date) {
+        let expired = documents.filter { now.timeIntervalSince($0.value.lastUsed) > Self.documentLifetime }
+        guard !expired.isEmpty else { return }
+        for key in expired.keys { documents.removeValue(forKey: key) }
+        cancelRunningJobIfStale()
+    }
+
+    private func orderedDocuments() -> [ExternalDocument] {
+        documents.values.sorted { $0.sequence > $1.sequence }
+    }
+
+    /// Texts on screen or in a document.
+    private func liveSubjects() -> Set<TranslationSubject> {
+        var live = windows.values.reduce(into: Set<TranslationSubject>()) { $0.formUnion($1.subjects) }
+        for document in documents.values { live.formUnion(document.subjects) }
+        return live
+    }
+
+    /// The first translation of a text about to be shown: the draft model when the plan has one.
+    private func urgentDocumentJob(_ documents: [ExternalDocument], now: Date) -> Job? {
+        for document in documents {
+            guard let model = document.plan.draft ?? document.plan.final else { continue }
+            for index in document.urgentRange {
+                guard let subject = document.entries[index].subject, !hasAnyTranslation(subject),
+                    !isBlocked(JobID(subject: subject, model: model), now: now)
+                else { continue }
+                return makeDocumentJob(document, index: index, model: model)
+            }
+        }
+        return nil
+    }
+
+    /// Reading ahead: the final translation of the texts about to be shown, then the texts after them, in order,
+    /// straight with the final model (there is time, so no draft first).
+    private func prefetchDocumentJob(_ documents: [ExternalDocument], now: Date) -> Job? {
+        for document in documents {
+            guard let model = document.plan.final ?? document.plan.draft else { continue }
+            for index in document.focus..<document.entries.count {
+                guard let subject = document.entries[index].subject, !cache.contains(subject.key(for: model)),
+                    !isBlocked(JobID(subject: subject, model: model), now: now)
+                else { continue }
+                return makeDocumentJob(document, index: index, model: model)
+            }
+        }
+        return nil
+    }
+
+    private func makeDocumentJob(_ document: ExternalDocument, index: Int, model: ModelSize) -> Job {
+        let entry = document.entries[index]
+        let subject = entry.subject!
+        let useHistory = document.settings.profile.useConversationHistory
+        return Job(
+            id: JobID(subject: subject, model: model), glossary: entry.glossary,
+            history: useHistory ? documentHistory(before: index, in: document) : [], useHistory: useHistory,
+            streams: false, isUpgrade: hasAnyTranslation(subject), manualID: nil)
+    }
+
+    /// Earlier texts of the document that already have a translation, newest last, within
+    /// `historyCharacterLimit`. Stops at the first one without: history must be what came right before.
+    private func documentHistory(before index: Int, in document: ExternalDocument) -> [TranslationHistoryPair] {
+        guard index > 0 else { return [] }
+        var pairs: [TranslationHistoryPair] = []
+        var total = 0
+        for entry in document.entries[..<index].reversed() {
+            guard let subject = entry.subject else { continue }
+            guard
+                let cached = cache.best(
+                    for: subject, finalModel: document.plan.final, draftModel: document.plan.draft, touch: false)
+            else { break }
+            let translation = TextSanitizer.neutralizeControlSequences(cached.translation)
+            let size = subject.text.count + translation.count
+            if total + size > configuration.historyCharacterLimit { break }
+            total += size
+            pairs.append(TranslationHistoryPair(source: subject.text, translation: translation))
+        }
+        return pairs.reversed()
+    }
+}
+
+extension TranslationCoordinator.ExternalDocument {
+    fileprivate var items: [TranslationCoordinator.ExternalItem] {
+        entries.map { TranslationCoordinator.ExternalItem(id: $0.id, text: $0.original) }
+    }
+}
+
+extension TranslationCoordinator {
+    /// Forgets every browser extension document (the extensions were turned off).
+    func closeAllDocuments() {
+        for key in Array(documentKeys) { closeDocument(key) }
     }
 }
