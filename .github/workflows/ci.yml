@@ -1,6 +1,6 @@
 # Checks every pull request and every push to main: the workflows and scripts, the release scripts' tests, that
-# Plamonic.xcodeproj is what XcodeGen makes from project.yml, the app's unit tests and PlamoKit's tests. PlamoKit's
-# tests that need a downloaded model skip.
+# Plamonic.xcodeproj is what XcodeGen makes from project.yml, the browser extension's types and tests, the app's unit
+# tests and PlamoKit's tests. PlamoKit's tests that need a downloaded model skip.
 #
 # - No job has secrets, and the GITHUB_TOKEN can only read the repository.
 # - The macOS jobs run on the runner image with Xcode 27 and use the Xcode that XCODE names (scripts/select-xcode.sh).
@@ -99,6 +99,17 @@ jobs:
             echo "::error::Plamonic.xcodeproj is not what project.yml makes. Run xcodegen generate (XcodeGen ${XCODEGEN_VERSION}) and commit the result."
             exit 1
           fi
+
+      # With the packages of package-lock.json, and the Node of the runner image. The app's build copies dist/safari
+      # into its Safari extension (scripts/build-web-extension.sh).
+      - name: Check, test and build the browser extension
+        working-directory: BrowserExtension
+        run: |
+          node --version
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npm run build
 
       # Signed ad hoc (Config/Signing.xcconfig), with the package versions of Package.resolved.
       # A test that fails once is run once more: the runner is slower than a Mac, and some tests wait on timers.

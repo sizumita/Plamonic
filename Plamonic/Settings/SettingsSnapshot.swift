@@ -72,6 +72,35 @@ struct SettingsSnapshot: Equatable, Sendable {
         EffectiveSettings(profile: profile(for: bundleID, appName: appName), global: global)
     }
 
+    // MARK: Websites
+
+    /// The stored (user) profile with this pattern, if any.
+    func userSite(_ pattern: String) -> SiteProfile? {
+        document.sites.last { $0.pattern.caseInsensitiveCompare(pattern) == .orderedSame }
+    }
+
+    func siteSource(_ pattern: String) -> ProfileSource {
+        if userSite(pattern) != nil { return .user }
+        if SitePresets.preset(for: pattern) != nil { return .preset }
+        return .defaults
+    }
+
+    /// Stored site profiles and the presets the user has not edited.
+    var siteProfiles: [SiteProfile] {
+        document.sites + SitePresets.all.filter { userSite($0.pattern) == nil }
+    }
+
+    /// The profile for a page: the most specific matching one (stored or preset), else a manual profile for its
+    /// site, so a page without settings is translated when chosen in the extension's menu.
+    func siteProfile(for url: URL) -> (profile: SiteProfile, source: ProfileSource) {
+        let matches = siteProfiles.compactMap { profile in
+            SitePattern.specificity(profile.pattern, url: url).map { (profile, $0) }
+        }
+        if let best = matches.max(by: { $0.1 < $1.1 })?.0 { return (best, siteSource(best.pattern)) }
+        let pattern = SitePattern.suggested(for: url) ?? url.absoluteString
+        return (SiteProfile(pattern: pattern, displayName: pattern), .defaults)
+    }
+
     /// The profile used for apps without a preset or a user profile.
     static func defaultProfile(bundleID: String, appName: String?, global: GlobalSettings) -> AppProfile {
         let name = appName.flatMap { $0.isEmpty ? nil : $0 } ?? bundleID

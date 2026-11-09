@@ -22,7 +22,8 @@ Plamonic.app (AppKit + SwiftUI, LSUIElement, 非サンドボックス)
 ├── Translation/    翻訳キャッシュ、言語判定、段階翻訳（下書き→仕上げ）のスケジューラ
 ├── Session/        リアルタイムループ（走査→差分→翻訳依頼→描画）、アプリ切替追跡
 ├── Hotkeys/        グローバルホットキー（Carbon RegisterEventHotKey）
-└── Updates/        Sparkle 2 によるアップデート（フィードの選択、設定、--update-probe）。7.1
+├── Updates/        Sparkle 2 によるアップデート（フィードの選択、設定、--update-probe）。7.1
+└── Bridge/         ブラウザ拡張機能（Safari・Chrome）からの翻訳依頼を受けるソケット。9 章
 
 Packages/PlamoKit (Swift Package, mlx-swift 0.32.3 のみに依存)
 ├── PlamoTokenizer      tokenization_plamo.py の移植（Aho-Corasick + Viterbi、バイトフォールバック）
@@ -119,6 +120,7 @@ plamo-cli               コマンドラインツール（tokenize / translate / 
 | 走査間隔 | 前面アプリ / 背面アプリそれぞれ |
 | スクロール中は隠す | スクロール・ウインドウ移動中はオーバーレイを隠し、止まったら再走査 |
 | パスワード入力中は読み取らない | 「一般」の「プライバシー」、既定オン。パスワードの入力中はほかのアプリのテキストも画面も読まない。4.1 |
+| ブラウザの拡張機能に翻訳を提供する | 「一般」の「ブラウザ」、既定オン。Safari・Chrome の拡張機能からの依頼を受けるソケットを開く。9 章 |
 | 部分結果を逐次表示 | 生成途中の訳文をストリーミング表示 |
 | 上限 | 1 回の走査で扱う最大セグメント数、1 セグメントの最大文字数、最小文字数 |
 | メモリ | アイドル時に自動アンロードするまでの分数 |
@@ -741,6 +743,10 @@ c は「<アプリ名> がパスワードを待っているため、このウイ
 - 画面収録の許可は任意（背景色を原文に合わせるときだけ使う）。取り込んだ画像は色を測るだけで、保存も送信もしない。
   初回の案内の 3 番目（「見た目をなじませる（任意）」）と「表示」設定から求める。許可が反映されるまで再起動が要ることがある
   （`CGPreflightScreenCaptureAccess` が再起動まで false のままのことがある）。許可を確かめるだけでシステムの確認は出さない。
+- Safari の拡張機能（`PlamonicSafariExtension.appex`、9 章）と Chrome の Native Messaging ホスト
+  （`Contents/Helpers/plamonic-chrome-host`）を同梱する。リリースでは `scripts/sign-app.sh` が、ホストを、続いて
+  拡張機能を `PlamonicSafariExtension/PlamonicSafariExtension.entitlements`（サンドボックスと App Group）で先に署名する。
+  Safari 18.4 以降は、Developer ID で署名し公証を受けた拡張機能を App Store の外から配れる。
 - LSUIElement（Dock に出さない）。bundle ID は `io.smdr.Plamonic`。設定・キャッシュ・モデルは bundle ID ではなく
   `~/Library/Application Support/Plamonic` に置く。
 - 配布するアプリ（正式版とベータ版）は Developer ID で署名し、公証を受ける。署名がバージョンをまたいで同じなので、
@@ -796,3 +802,109 @@ c は「<アプリ名> がパスワードを待っているため、このウイ
 | Claude Code / Codex / OpenCode の CLI | Terminal.app / iTerm2（Ghostty は AXBoundsForRange がないため未対応） | ターミナルモード |
 
 構造の詳細は [AX_NOTES.md](AX_NOTES.md)。
+
+## 9. ブラウザ拡張機能（`Bridge/`）
+
+Safari と Chrome の Plamonic 拡張機能が、YouTube の字幕などをこの Mac の PLaMo で訳すための受け口。拡張機能は
+ページから文章を集めて表示し、翻訳はアプリが行う。設定「一般」の「ブラウザの拡張機能に翻訳を提供する」
+（`acceptBrowserExtensions`、既定オン）がオフのあいだはソケットを開かない。「翻訳を有効にする」（⌃⌥T）は画面の
+オーバーレイのスイッチなので、拡張機能には効かない（拡張機能は自分のオン・オフを持つ）。オフにしても文書は忘れない。
+
+### 9.1 経路
+
+```
+拡張機能（Safari・Chrome で共通の MV3 コード）
+  ├ Safari: browser.runtime.sendNativeMessage → 同梱の .appex（サンドボックス）
+  └ Chrome: chrome.runtime.sendNativeMessage → Native Messaging ホスト（.app 内のヘルパー）
+      ↓ 1 行 1 リクエストの JSON（Unix ソケット）
+Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「文書」
+```
+
+- ソケットは App Group `NBDP5VK335.io.smdr.Plamonic` のコンテナの `bridge.sock`。サンドボックスの Safari 拡張が
+  届くのはここだけ。グループ ID がアプリの署名のチーム ID で始まるときだけ使い、そうでないビルド（アドホック署名、
+  別のチーム）は `~/Library/Application Support/Plamonic/bridge.sock` に置く（グループのコンテナに触ると macOS が
+  ほかのアプリのデータへのアクセスを確認するため）。そのビルドでは Chrome だけが使える。
+- Safari の拡張機能はアプリに同梱する `Contents/PlugIns/PlamonicSafariExtension.appex`（サンドボックス、同じ App Group）。
+  中身は `BrowserExtension/dist/safari`（ビルドフェーズ `scripts/build-web-extension.sh` が入れる）と、メッセージを
+  そのままソケットへ渡す `SafariWebExtensionHandler`（`BridgeClient` を使う）。チームの署名がないビルドでは
+  App Group を使えないので、拡張機能は `appNotRunning` を返す。
+- Chrome（と Chromium 系のブラウザ）の Native Messaging ホストは、アプリに同梱する
+  `Contents/Helpers/plamonic-chrome-host`。ブラウザが拡張機能のメッセージごとに起動し、4 バイトの長さ付きの JSON
+  （`NativeMessaging`）をそのままソケットへ渡して答えを返す。ソケットは App Group のコンテナ、なければ
+  Application Support の順に探す（`BridgeLocation.candidatePaths`）。アプリが起動していなければ `appNotRunning`。
+  ブラウザへの答えは 1 MB まで。
+- アプリは起動時（ソケットを開いたとき）に、ホストのマニフェスト `io.smdr.plamonic.json` を入っているブラウザ
+  （Chrome、Chrome Beta / Dev / Canary、Chromium、Edge、Brave、Arc、Vivaldi）の `NativeMessagingHosts` に書く
+  （`ChromeNativeHostInstaller`）。中身が同じなら書かない。アプリを動かしても次の起動で直る。使える拡張機能は
+  `allowed_origins` に載せた ID だけ（開発用ビルドの ID。Chrome Web Store に出したらその ID を足す）。
+- 権限 0600 で、つなげてきたプロセスの uid が同じときだけ受ける。1 つの接続で何行送ってもよく、最後の行は改行が
+  なくても（送り側が書き込みを閉じれば）答える。1 行は 8 MB まで。60 秒何も来ない接続は切る。
+- 実際のブラウザで確かめたことと、ブラウザやサイトごとに気をつけることは [BROWSER_EXTENSION_NOTES.md](BROWSER_EXTENSION_NOTES.md)。
+- 拡張機能の構成と機能の足し方は [BrowserExtension/README.md](../BrowserExtension/README.md)。
+
+### 9.2 メッセージ（`BridgeProtocol`、プロトコル 1）
+
+リクエストは `{"id": 任意, "type": …}`。応答は同じ `id` と `ok` を持ち、失敗なら `error`
+（`badRequest` / `unknownDocument` / `disabled` / `tooLarge`）と `message`。
+
+| type | 内容 | 応答 |
+| --- | --- | --- |
+| `hello` | 起動しているか、何ができるか（`url` を付けると、`targetLanguage` はそのページのサイトの翻訳先） | `protocol`、`version`、`enabled`、`targetLanguage`、`ready`（モデルがあるか）、`features`（`documents`、`translate`、`sites`） |
+| `sync` | 文書の文章（`items: [{id, text}]`、初回と変わったときだけ。2,000 文字を超える文章は訳さず skipped）、`focus`（表示中の項目の id）、`urgent`（focus から何件を急ぐか、既定 3、最大 20）、`visible`（画面に見えている項目の id、上から順。60 件まで。あればこちらを急ぐ）、`kind`、`context`、`sourceLanguage`、`want`（結果が欲しい id、省略で全部） | `results: [{id, state, text?}]`（state は pending / draft / final / failed / skipped）、`progress: {done, total}`（字幕は focus から先、ページは全部） |
+| `close` | 文書を閉じる（タブを閉じた、別の動画に移った） | — |
+| `translate` | `texts`（20 件まで）をすぐ訳す（選択範囲など） | `translations`（失敗したところは null） |
+| `site` | `url` のページの Webサイトの設定（9.4） | `site: {pattern, name, mode, include, exclude, source}` |
+| `sites` | 動作が自動のサイト | `sites: [...]`（`site` と同じ形） |
+| `setSite` | `url` のサイトの動作を `mode`（off / automatic / manual）にして設定に保存する（拡張機能のメニュー） | `site` |
+
+- 文書は `client`（`safari` / `chrome`）と `document`（例 `yt:<動画 ID>`）で区別する。アプリが再起動したり、
+  5 分間問い合わせがなくて忘れたりした文書に `items` なしで `sync` すると `unknownDocument` を返すので、
+  拡張機能は `items` を付けて送り直す。
+- `kind: "captions"` は 1 本の話の続きなので、直前の行の訳を会話履歴として渡す。`"page"`（ほかの値も）は渡さず、
+  先読みはページ全体（focus より前も）に及ぶ。
+  `context`（動画のタイトルとチャンネルなど）は PFML3 の context に、`sourceLanguage`（BCP 47）は PLaMo の言語コードに
+  直せるときだけ翻訳元言語にする。
+- Safari の `sendNativeMessage` は 1 回の依頼に 1 回答えるだけなので、結果は拡張機能が取りに来る（ポーリング）。
+
+### 9.3 文書の翻訳順（`TranslationCoordinator`）
+
+文書は全部の文章を一度に受け取り、あとは `focus` を動かす。ウインドウと同じく、手が空いたときに最新の状態から
+次の 1 件を選ぶ。
+
+1. 手動の依頼（`translateOnce`、`translate`）
+2. 文書の画面に見えている項目（`visible` の順。なければ focus から `urgent` 件）のうち、まだ訳のないもの。下書きモデルがあれば下書きで
+3. ウインドウの初回の翻訳
+4. ウインドウの仕上げ
+5. 文書の先読み: 急ぐ項目の仕上げ、focus から後ろを順に、ページならそのあと focus より前を、仕上げのモデルで直接
+   （時間があるので下書きを挟まない）
+
+字幕では focus より前の行は訳さない（もう表示し終えた）。ページでは、見えている段落が固定のヘッダーと本文の途中のように
+離れていても `visible` で正しく急げる。設定はグローバル設定に、文書の `context` と `sourceLanguage` を
+重ねたもの。キャッシュ、失敗時の待機、長い文の分割、仕上げの途中で新しい急ぎの文章に譲るのはウインドウと同じ。
+文書を閉じる・忘れると、その文章だけが待っていた翻訳は止める。
+
+### 9.4 Webサイトの設定（`SiteProfile`、設定「Webサイト」）
+
+拡張機能がサイトごとにどう訳すかは、アプリの設定で一元管理する（ブラウザごとには持たない）。アプリの設定
+（`AppProfile`）と同じく、プリセット → 利用者が編集したもの（settings.json の `sites`）の順に重ね、プリセットと同じに
+戻した設定は保存しない。
+
+| 項目 | 内容 |
+| --- | --- |
+| サイト（`pattern`） | ホスト名（`www.youtube.com`）、`*.` を付けたドメイン（`*.wikipedia.org`、そのドメインとサブドメイン）、後ろにパスの先頭（`github.com/apple`）。URL に合うもののうち、ホスト名がそのまま一致し、パスが長いものほど優先 |
+| 動作 | 自動（ページを開いたら訳す）／手動（拡張機能のメニューの「このページを翻訳」）／オフ（訳さない）。設定のないサイトは手動でページ全体 |
+| 翻訳する場所・しない場所 | CSS セレクタ（1 行に 1 つ）。する場所が空ならページ全体。する場所に合う要素は、行の中に表示される要素でも 1 段落として扱う。読めないセレクタは使わない |
+| 翻訳先言語・文体・文脈 | 全体の設定を上書き。文脈はページのタイトルの前に付ける |
+
+- プリセット: YouTube（タイトル、説明、コメント）、X、Reddit、GitHub、Wikipedia、Hacker News。
+- 拡張機能はページを開くと `site`（URL）で設定を聞き、`sync` / `translate` には `url` を付けてサイトの上書きを適用させる。
+- ツールバーのメニュー: 「このページを翻訳」（その場で 1 回）、「このサイトを自動で翻訳」（`setSite` でアプリの設定を
+  自動にし、ブラウザの許可を求め、このページも訳す）、自動のサイトでは「このサイトの自動翻訳を一時停止」／「自動翻訳を
+  再開」（一時停止は拡張機能がサイトごとに覚え、アプリの設定は自動のまま）。
+- 自動のサイト: 拡張機能はサイトに入る許可がないとページを開いたことも知れないので、自動のサイトで初めてメニューを
+  開いたときに一度だけ許可を求める（`permissions.request`、クリックが要る）。
+  - 「すべてのサイトで自動翻訳を使う」（おすすめ）: content script をすべてのページに登録し、ページを開くたびにアプリに
+    設定を聞く。以後はアプリで自動にするだけで、次に開いたページから訳される。自動でないページでは何もしない。
+  - 「このサイトだけ許可」: `sites` で自動のサイトを聞き、許可されたサイトだけに登録する。
+  - 登録は `scripting.registerContentScripts`。YouTube の字幕の翻訳はサイトの動作とは別（オフでも字幕は訳す）。
+

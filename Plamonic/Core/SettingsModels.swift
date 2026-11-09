@@ -332,6 +332,8 @@ struct GlobalSettings: Codable, Equatable, Sendable {
     /// Stop reading other apps' text while a password is being typed (secure input, a focused password field,
     /// a terminal password prompt). DESIGN §4.1.
     var pauseDuringPasswordEntry: Bool = true
+    /// Translate for the Safari and Chrome extensions (YouTube captions) over the bridge socket. DESIGN §9.
+    var acceptBrowserExtensions: Bool = true
     var streamPartialResults: Bool = true
     var maxSegmentsPerScan: Int = 80
     var maxSegmentCharacters: Int = 2000
@@ -403,6 +405,8 @@ struct GlobalSettings: Codable, Equatable, Sendable {
         hideWhileScrolling = try c.decodeIfPresent(Bool.self, forKey: .hideWhileScrolling) ?? d.hideWhileScrolling
         pauseDuringPasswordEntry =
             try c.decodeIfPresent(Bool.self, forKey: .pauseDuringPasswordEntry) ?? d.pauseDuringPasswordEntry
+        acceptBrowserExtensions =
+            try c.decodeIfPresent(Bool.self, forKey: .acceptBrowserExtensions) ?? d.acceptBrowserExtensions
         streamPartialResults =
             try c.decodeIfPresent(Bool.self, forKey: .streamPartialResults) ?? d.streamPartialResults
         maxSegmentsPerScan = try c.decodeIfPresent(Int.self, forKey: .maxSegmentsPerScan) ?? d.maxSegmentsPerScan
@@ -443,6 +447,7 @@ struct GlobalSettings: Codable, Equatable, Sendable {
         try c.encode(backgroundScanInterval, forKey: .backgroundScanInterval)
         try c.encode(hideWhileScrolling, forKey: .hideWhileScrolling)
         try c.encode(pauseDuringPasswordEntry, forKey: .pauseDuringPasswordEntry)
+        try c.encode(acceptBrowserExtensions, forKey: .acceptBrowserExtensions)
         try c.encode(streamPartialResults, forKey: .streamPartialResults)
         try c.encode(maxSegmentsPerScan, forKey: .maxSegmentsPerScan)
         try c.encode(maxSegmentCharacters, forKey: .maxSegmentCharacters)
@@ -464,7 +469,7 @@ struct GlobalSettings: Codable, Equatable, Sendable {
         case keepTranslatingInactiveApps, defaultMode, defaultScope, displayStyle, appearance, interaction
         case showOriginalModifier
         case scanInterval, backgroundScanInterval, hideWhileScrolling, streamPartialResults, maxSegmentsPerScan
-        case pauseDuringPasswordEntry
+        case pauseDuringPasswordEntry, acceptBrowserExtensions
         case maxSegmentCharacters, minTextLength, idleUnloadMinutes, cacheCapacity, persistCache, glossary
         case toggleHotkey, translateNowHotkey, launchAtLogin, receiveBetaUpdates
     }
@@ -551,6 +556,8 @@ struct SettingsDocument: Codable, Equatable, Sendable {
     var global: GlobalSettings = GlobalSettings()
     /// Profiles the user created or edited. Presets that were never edited are not stored here.
     var profiles: [AppProfile] = []
+    /// Website profiles the user created or edited, for the browser extensions. Same rule as `profiles`.
+    var sites: [SiteProfile] = []
 
     init() {}
 
@@ -559,9 +566,10 @@ struct SettingsDocument: Codable, Equatable, Sendable {
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
         global = try c.decodeIfPresent(GlobalSettings.self, forKey: .global) ?? GlobalSettings()
         profiles = try c.decodeIfPresent([AppProfile].self, forKey: .profiles) ?? []
+        sites = try c.decodeIfPresent([SiteProfile].self, forKey: .sites) ?? []
     }
 
-    private enum CodingKeys: String, CodingKey { case version, global, profiles }
+    private enum CodingKeys: String, CodingKey { case version, global, profiles, sites }
 }
 
 /// The settings that apply to one app after merging its profile with the global settings.

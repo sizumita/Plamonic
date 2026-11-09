@@ -94,11 +94,14 @@ struct SettingsTokenListField: View {
 /// Return starts a new line, so the list is committed when editing ends.
 struct SettingsPatternListEditor: View {
     @Binding var patterns: [String]
+    /// Lines are regular expressions, checked as they are typed (else free text, such as CSS selectors).
+    var regularExpressions = true
     @State private var text: String
     @FocusState private var isFocused: Bool
 
-    init(patterns: Binding<[String]>) {
+    init(patterns: Binding<[String]>, regularExpressions: Bool = true) {
         self._patterns = patterns
+        self.regularExpressions = regularExpressions
         self._text = State(initialValue: patterns.wrappedValue.joined(separator: "\n"))
     }
 
@@ -116,7 +119,7 @@ struct SettingsPatternListEditor: View {
                 .onChange(of: patterns) { _, newPatterns in
                     if Self.parse(text) != newPatterns { text = newPatterns.joined(separator: "\n") }
                 }
-            let invalid = RuleSuggestions.invalidPatterns(Self.parse(text))
+            let invalid = regularExpressions ? RuleSuggestions.invalidPatterns(Self.parse(text)) : []
             if !invalid.isEmpty {
                 Label("正規表現として読めない行があります: \(invalid.joined(separator: "  "))", systemImage: "exclamationmark.triangle")
                     .font(.caption)

@@ -11,10 +11,12 @@ This guide covers building Plamonic from source, running its tests, and how rele
   `xcodebuild -downloadComponent MetalToolchain`.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.46.0 (for example `brew install xcodegen`). CI checks that the
   committed project is what this version makes.
+- Node.js with npm, for the browser extension (`BrowserExtension/`). The app's build puts it into the Safari extension.
 
 ## Local setup
 
 ```sh
+(cd BrowserExtension && npm ci && npm run build)
 xcodegen generate
 xcodebuild -project Plamonic.xcodeproj -scheme Plamonic -configuration Debug \
   -derivedDataPath build/DD -destination 'platform=macOS,arch=arm64' build
@@ -30,6 +32,27 @@ A build from source has the bundle ID of the release (`io.smdr.Plamonic`) and us
 `~/Library/Application Support/Plamonic`. Quit an installed Plamonic before you run one. Its version comes from
 `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml`, and it has no update key, so it never updates
 itself ([Updates](#updates)).
+
+The Safari extension's build phase (`scripts/build-web-extension.sh`) copies `BrowserExtension/dist/safari` into
+`Contents/PlugIns/PlamonicSafariExtension.appex`. When the web extension's sources are newer than that build, it
+rebuilds it with Node (found on the usual paths, since Xcode runs build phases with a minimal `PATH`), or fails and
+says to run `npm run build`. [BrowserExtension/README.md](../BrowserExtension/README.md) explains the extension.
+
+### Trying the browser extensions
+
+- **Safari** finds the extension in the app. Two things keep it from appearing in Safari › Settings › Extensions:
+  the app being inside a hidden folder (a worktree under `.claude/`, say; copy it to `~/Applications` and open it from
+  there), and a signature Safari does not accept. A build that is not Developer ID signed and notarized needs Safari's
+  Develop › Developer Settings › Allow unsigned extensions, which Safari turns off again when it quits. The
+  extension talks to the app through the App Group container, so it needs a build signed by the team that owns the
+  group (`NBDP5VK335`, [Signing local builds](#signing-local-builds)); an ad-hoc build shows the extension, but the
+  extension cannot reach the app.
+- **Chrome** (and other Chromium browsers): load `BrowserExtension/dist/chrome` unpacked in `chrome://extensions`,
+  built with `npm run build:dev`, whose fixed key gives it the extension ID the host allows. Chrome reaches the app
+  through the native messaging host inside it (`Contents/Helpers/plamonic-chrome-host`), which Plamonic registers with
+  the installed browsers when it starts (`~/Library/Application Support/<browser>/NativeMessagingHosts/io.smdr.plamonic.json`).
+  The manifest names the app it was written by, so after trying a build from another folder, start the app you
+  mean to use again.
 
 ### Signing local builds
 
@@ -65,6 +88,9 @@ cd ../..
 
 # The release scripts (version.sh and appcast.sh)
 scripts/test.sh
+
+# The browser extension: its types, and caption parsing and the document sync
+(cd BrowserExtension && npm run typecheck && npm test)
 ```
 
 - The unit tests run inside Plamonic.app, which then starts nothing of its own: no menu bar item, windows, hotkeys,
@@ -76,8 +102,8 @@ scripts/test.sh
 - PlamoKit is tested with `xcodebuild`, not `swift test`: SwiftPM alone cannot compile MLX's Metal shaders.
 
 [CI](../.github/workflows/ci.yml) runs on every pull request and every push to `main`: actionlint and ShellCheck on the
-workflows and scripts, `scripts/test.sh`, a check that `xcodegen generate` leaves nothing to commit, the app's unit
-tests and PlamoKit's tests. The macOS jobs run on GitHub's `xcode-27` runner image with the Xcode that `XCODE` names in
+workflows and scripts, `scripts/test.sh`, a check that `xcodegen generate` leaves nothing to commit, the browser
+extension's types and tests, the app's unit tests and PlamoKit's tests. The macOS jobs run on GitHub's `xcode-27` runner image with the Xcode that `XCODE` names in
 the workflows. While that image is a preview, `.github/actionlint.yaml` declares its label; when Xcode 27 is on a
 regular image, change `runs-on` in both workflows and delete that file.
 

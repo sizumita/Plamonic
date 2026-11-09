@@ -44,6 +44,8 @@ struct GeneralSettingsPane: View {
                 Text(Self.passwordPauseDescription)
             }
 
+            BrowserExtensionSection(store: store)
+
             Section("アクセシビリティ") {
                 LabeledContent("画面のテキストの読み取り") {
                     if accessibilityTrusted {

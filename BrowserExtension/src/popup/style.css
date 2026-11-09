@@ -1,0 +1,72 @@
+:root {
+  --bg: #ffffff;
+  --bg-hover: #f2f3f6;
+  --bg-soft: #f2f3f6;
+  --fg: #16181d;
+  --fg-soft: #626874;
+  --fg-faint: #8b919c;
+  --line: #e6e8ec;
+  --accent: #3444e3;
+  --warn: #a35a06;
+  --warn-bg: #fff5e6;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1d22;
+    --bg-hover: #26282e;
+    --bg-soft: #26282e;
+    --fg: #eceef2;
+    --fg-soft: #a5abb6;
+    --fg-faint: #767c87;
+    --line: #2f3238;
+    --accent: #8a98ff;
+    --warn: #f0b060;
+    --warn-bg: #3a2c17;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; width: 300px; padding: 6px;
+  background: var(--bg); color: var(--fg);
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+}
+
+button { font: inherit; color: inherit; }
+
+.notice {
+  margin: 2px 2px 6px; padding: 8px 10px; border-radius: 8px;
+  background: var(--warn-bg); color: var(--warn); font-size: 12px;
+}
+
+.item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border: 0; border-radius: 8px; background: transparent;
+  text-align: left; cursor: pointer;
+}
+.item:hover:not(:disabled) { background: var(--bg-hover); }
+.item:disabled { cursor: default; opacity: .55; }
+.item svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.item .text { display: flex; flex-direction: column; min-width: 0; }
+.item .detail { color: var(--fg-faint); font-size: 11px; }
+
+.choice { padding: 8px 10px 10px; }
+.choice .label { color: var(--fg-soft); font-size: 12px; margin-bottom: 6px; }
+.segmented { display: flex; background: var(--bg-soft); border-radius: 8px; padding: 2px; }
+.segmented button {
+  flex: 1; border: 0; background: transparent; padding: 4px 6px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; color: var(--fg-soft);
+}
+.segmented button[aria-pressed="true"] { background: var(--bg); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+
+.separator { height: 1px; background: var(--line); margin: 4px 6px; }
+
+.empty { padding: 14px 12px; color: var(--fg-soft); text-align: center; }
+
+.site {
+  padding: 6px 10px 4px; color: var(--fg-faint); font-size: 11px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

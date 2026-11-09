@@ -82,6 +82,24 @@ also translate the whole window, just the paragraph under the pointer, or just t
 Most other apps work too. They start in manual mode: press ⌃⌥R when you want a translation. To choose what gets
 translated, use 要素を調べる (inspect element) in 設定 › アプリ and point at the text.
 
+## Browser extensions
+
+Plamonic also comes with extensions for Safari and Chrome. The Plamonic app on your Mac does the translating, so the
+extensions send nothing off your Mac either.
+
+- **YouTube captions**: the translated captions are listed with their times in a sidebar that follows the video as it
+  plays. Click a line to jump there. The extension can also show the translation on the video in place of the captions.
+- **Page translation**: choose このページを翻訳 (translate this page) from the Plamonic toolbar menu. The paragraphs on
+  screen are translated first and the rest after. Rest the pointer on a translation to see the original.
+- **Per-site settings**: in 設定 › Webサイト, set each site to automatic, manual or off, and choose where to translate
+  with CSS selectors. Sites set to automatic are translated as soon as you open them. YouTube, X, Reddit, GitHub,
+  Wikipedia and Hacker News have presets.
+
+The Safari extension is inside Plamonic: open Plamonic once, then turn Plamonic on in Safari's Settings › Extensions.
+The Chrome extension will be published on the Chrome Web Store. Until then, you can
+[build it from source](BrowserExtension/README.md) and load it. The [user guide](docs/USAGE.ja.md) (Japanese) has the
+details.
+
 ## Getting started
 
 1. Download `Plamonic.dmg` from the [latest release](https://github.com/sizumita/Plamonic/releases/latest) and drag
@@ -117,6 +135,8 @@ The [user guide](docs/USAGE.ja.md) (Japanese) explains every setting and what to
   and does not capture the screen. It never reads what is in a password field.
 - Translations are cached in `~/Library/Application Support/Plamonic`, readable only by your account. The cache can be
   turned off.
+- The browser extensions talk to Plamonic only on your Mac, over a socket that only your account can connect to. They
+  pass Plamonic only the text to translate and the page's address and title.
 
 ## FAQ
 

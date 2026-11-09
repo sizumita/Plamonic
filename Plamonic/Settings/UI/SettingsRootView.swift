@@ -27,7 +27,7 @@ struct SettingsUIActions {
 }
 
 enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
-    case general, translation, models, apps, glossary, display, hotkeys, advanced
+    case general, translation, models, apps, sites, glossary, display, hotkeys, advanced
 
     var id: String { rawValue }
 
@@ -37,6 +37,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .translation: "翻訳"
         case .models: "モデル"
         case .apps: "アプリ"
+        case .sites: "Webサイト"
         case .glossary: "用語集"
         case .display: "表示"
         case .hotkeys: "ホットキー"
@@ -50,6 +51,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .translation: "character.bubble"
         case .models: "cpu"
         case .apps: "square.grid.2x2"
+        case .sites: "globe"
         case .glossary: "book.closed"
         case .display: "textformat.size"
         case .hotkeys: "keyboard"
@@ -106,6 +108,7 @@ struct SettingsRootView: View {
         case .translation: TranslationSettingsPane(store: store)
         case .models: ModelSettingsPane(store: store, models: models)
         case .apps: AppsSettingsPane(store: store, inspector: inspector, runningApps: runningApps)
+        case .sites: SitesSettingsPane(store: store)
         case .glossary: GlossarySettingsPane(store: store)
         case .display: DisplaySettingsPane(store: store, actions: actions)
         case .hotkeys: HotkeySettingsPane(store: store)
