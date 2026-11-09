@@ -1,5 +1,6 @@
-import { ext } from "../../shared/api";
-import type { Settings } from "../../shared/settings";
+import type { PageAction } from "../../shared/actions";
+import { BROWSER, ext } from "../../shared/api";
+import { updateSettings, type Settings } from "../../shared/settings";
 import { DocumentSync } from "../../content/document-sync";
 import type { Feature, FeatureContext, FeatureInstance } from "../../content/feature";
 import { CONTENT_SOURCE, HOOK_SOURCE, type CaptionTrack, type HookMessage, type HookRequest } from "./hook-messages";
@@ -20,6 +21,7 @@ import { CAPTIONS_VIEW, type CaptionsPhase, type CaptionsViewState } from "./vie
  */
 export const youtubeCaptions: Feature = {
   id: "youtube-captions",
+  activation: "auto",
   matches: (url) => url.hostname === "www.youtube.com",
   create: (context) => new YouTubeCaptions(context),
 };
@@ -76,6 +78,30 @@ class YouTubeCaptions implements FeatureInstance {
     this.overlay.setMode(settings.captionOverlay);
   }
 
+  /** The toolbar menu: what the video shows. */
+  actions(): PageAction[] {
+    if (!this.video) return [];
+    return [
+      {
+        id: "overlay",
+        kind: "choice",
+        label: "動画の字幕",
+        value: this.context.settings().captionOverlay,
+        options: [
+          { value: "translation", label: "訳文" },
+          { value: "both", label: "訳文＋原文" },
+          { value: "off", label: "元の字幕" },
+        ],
+      },
+    ];
+  }
+
+  perform(action: string, value?: string) {
+    if (action === "overlay" && (value === "translation" || value === "both" || value === "off")) {
+      void updateSettings({ captionOverlay: value });
+    }
+  }
+
   command(command: string, args: unknown) {
     if (command === "seek" && this.videoElement) {
       const time = (args as { time: number }).time;
@@ -86,7 +112,9 @@ class YouTubeCaptions implements FeatureInstance {
     }
   }
 
-  view(): CaptionsViewState {
+  /** Only video pages have something for the sidebar. */
+  view(): CaptionsViewState | undefined {
+    if (!this.video) return undefined;
     const sync = this.sync;
     return {
       kind: CAPTIONS_VIEW,
@@ -139,6 +167,7 @@ class YouTubeCaptions implements FeatureInstance {
         items: this.segments.map((segment) => ({ id: segment.id, text: segment.text })),
         context: [this.title, this.channel].filter(Boolean).join(" / "),
         sourceLanguage: track.languageCode,
+        url: location.href,
         onChange: () => {
           this.renderOverlay();
           this.context.viewChanged();
@@ -151,12 +180,17 @@ class YouTubeCaptions implements FeatureInstance {
     this.sync?.start();
   }
 
-  /** The hook is loaded with a script tag at once, and with the scripting API if it does not answer. */
+  /**
+   * Chrome's manifest loads the hook into the page's world. Safari cannot, so it is inserted with a script tag
+   * there, and with the scripting API if it does not answer (in both browsers).
+   */
   private async ensureHook() {
-    const tag = document.createElement("script");
-    tag.src = ext.runtime.getURL("page-hook.js");
-    tag.onload = () => tag.remove();
-    (document.head ?? document.documentElement).append(tag);
+    if (BROWSER === "safari") {
+      const tag = document.createElement("script");
+      tag.src = ext.runtime.getURL("page-hook.js");
+      tag.onload = () => tag.remove();
+      (document.head ?? document.documentElement).append(tag);
+    }
     for (let attempt = 0; attempt < 20 && !this.hookReady; attempt++) {
       this.postToHook({ kind: "ping" });
       await sleep(100);

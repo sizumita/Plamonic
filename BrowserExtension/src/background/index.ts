@@ -1,6 +1,7 @@
 import { BROWSER, ext } from "../shared/api";
-import { TOGGLE_SIDEBAR_EVENT, type BackgroundMessage, type BackgroundReply, type ContentMessage } from "../shared/messages";
+import type { BackgroundMessage, BackgroundReply } from "../shared/messages";
 import { NativeBridge } from "./native-bridge";
+import { refreshAutomaticSites } from "./automatic-sites";
 
 /**
  * The background service worker: the only part that talks to the app (native messaging), and the place where
@@ -29,7 +30,16 @@ function handle(
     case "inject:main":
       return injectIntoPage(sender.tab?.id, message.file);
     case "sidebar:open":
-      return openSidePanel(sender.tab?.windowId);
+      return openSidePanel(sender.tab?.id);
+    case "site:get":
+      return bridge.call({ type: "site", url: message.url }).then((response) => response.site);
+    case "sites:refresh":
+      return refreshAutomaticSites(bridge, true);
+    case "site:set":
+      return bridge.call({ type: "setSite", url: message.url, mode: message.mode }).then(async (response) => {
+        await refreshAutomaticSites(bridge, true);
+        return response.site;
+      });
     default:
       return undefined;
   }
@@ -46,39 +56,29 @@ async function injectIntoPage(tabId: number | undefined, file: string): Promise<
   }
 }
 
-/** Chrome's side panel, opened from a click in the page (the click counts as the user action it needs). */
-async function openSidePanel(windowId: number | undefined): Promise<{ ok: boolean; error?: string }> {
-  if (windowId === undefined || !ext.sidePanel) return { ok: false, error: "no side panel" };
+/**
+ * Chrome's side panel for one tab, opened from a click in the page (the player's Plamonic button). The panel
+ * belongs to that tab: it hides on other tabs and shows that tab's feature.
+ */
+async function openSidePanel(tabId: number | undefined): Promise<{ ok: boolean; error?: string }> {
+  if (tabId === undefined || !ext.sidePanel) return { ok: false, error: "no side panel" };
   try {
-    await ext.sidePanel.open({ windowId });
+    // open() needs the click: start it before anything is awaited.
+    void ext.sidePanel.setOptions({ tabId, path: `sidebar.html?tab=${tabId}`, enabled: true });
+    await ext.sidePanel.open({ tabId });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String((error as Error)?.message ?? error) };
   }
 }
 
-// The toolbar button opens the sidebar: Chrome's side panel, or the panel the content script embeds in Safari
-// (Safari has no side panel API).
-if (BROWSER === "chrome") {
-  ext.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
-} else {
-  ext.action.onClicked.addListener((tab) => void toggleEmbeddedSidebar(tab.id));
+// The toolbar button opens the menu (popup). Chrome's side panel is opened per tab from there (or the page), so
+// it is off everywhere else. Chrome remembers the panel behavior across updates: an earlier version made the
+// button open the panel, so it is turned off explicitly.
+if (BROWSER === "chrome" && ext.sidePanel) {
+  ext.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+  ext.sidePanel.setOptions({ enabled: false }).catch(() => {});
 }
 
-/** Asks the content script to toggle its sidebar; if the message does not arrive, fires an event in the page. */
-async function toggleEmbeddedSidebar(tabId: number | undefined) {
-  if (tabId === undefined) return;
-  const message: ContentMessage = { type: "sidebar:toggle" };
-  let reply: { ok?: boolean } | undefined;
-  try {
-    reply = await ext.tabs.sendMessage(tabId, message);
-  } catch {}
-  if (reply?.ok) return;
-  try {
-    await ext.scripting.executeScript({
-      target: { tabId },
-      func: (name: string) => void window.dispatchEvent(new CustomEvent(name)),
-      args: [TOGGLE_SIDEBAR_EVENT],
-    });
-  } catch {}
-}
+// Sites set to automatic in the app change rarely; read them again when the worker starts (at most once a minute).
+void refreshAutomaticSites(bridge);

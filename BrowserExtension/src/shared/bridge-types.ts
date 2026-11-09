@@ -3,6 +3,8 @@
  * The extension sends them through the browser's native messaging; Safari's extension and Chrome's native host
  * forward them to the app's socket unchanged.
  */
+import type { SiteInfo } from "./sites";
+
 export const BRIDGE_PROTOCOL = 1;
 
 export type BridgeRequest =
@@ -14,12 +16,22 @@ export type BridgeRequest =
       items?: { id: string; text: string }[];
       focus?: string;
       urgent?: number;
+      /** The items on screen, top to bottom (a page): translated first. */
+      visible?: string[];
       want?: string[];
       context?: string;
       sourceLanguage?: string;
+      /** The page: its site's settings (target language, context) apply. */
+      url?: string;
     }
   | { type: "close"; document: string }
-  | { type: "translate"; texts: string[]; context?: string; sourceLanguage?: string };
+  | { type: "translate"; texts: string[]; context?: string; sourceLanguage?: string; url?: string }
+  /** The website settings for a page. */
+  | { type: "site"; url: string }
+  /** The sites set to translate by themselves. */
+  | { type: "sites" }
+  /** Sets the mode of the page's site in the app's settings; answers `site`. */
+  | { type: "setSite"; url: string; mode: "off" | "automatic" | "manual" };
 
 export type ResultState = "pending" | "draft" | "final" | "failed" | "skipped";
 
@@ -50,6 +62,9 @@ export interface BridgeResponse {
   progress?: { done: number; total: number };
   // translate
   translations?: (string | null)[];
+  // site, sites
+  site?: SiteInfo;
+  sites?: SiteInfo[];
 }
 
 /** What the extension knows about the app, shown in the sidebar header. */

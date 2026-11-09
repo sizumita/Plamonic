@@ -44,18 +44,13 @@
 
 .bar {
   display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px; border-bottom: 1px solid var(--line);
+  padding: 8px 10px 8px 12px; border-bottom: 1px solid var(--line);
 }
 .bar .logo { width: 18px; height: 18px; flex: none; }
 .bar .name { font-weight: 600; }
-.status {
-  margin-left: auto; font-size: 11px; color: var(--fg-soft);
-  padding: 2px 8px; border-radius: 999px; background: var(--bg-soft); white-space: nowrap;
-}
-.status[data-state="connected"] { color: var(--ok); }
-.status[data-state="unreachable"], .status[data-state="disabled"] { color: var(--warn); }
 .icon {
-  border: 0; background: transparent; cursor: pointer; padding: 2px 6px; border-radius: 6px; color: var(--fg-soft);
+  margin-left: auto; display: inline-flex; border: 0; background: transparent; cursor: pointer;
+  padding: 4px; border-radius: 6px; color: var(--fg-soft);
 }
 .icon:hover { background: var(--bg-soft); }
 

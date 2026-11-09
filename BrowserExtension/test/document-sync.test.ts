@@ -28,6 +28,9 @@ function fakeApp(options: { forgetAfter?: number; unreachableFor?: number } = {}
     tick: () => {},
     hasSidebar: () => false,
     toggleSidebar: () => {},
+    finished: () => {},
+    site: () => undefined,
+    pauseSite: () => {},
   };
   return { context, requests };
 }
@@ -87,5 +90,20 @@ test("reports when the app is not running, and recovers on retry", async () => {
   await until(() => sync.status.state === "unreachable");
   sync.retry();
   await until(() => sync.status.state === "ok" && sync.results.size === 3);
+  sync.stop();
+});
+
+test("a page sends what is on screen, and asks for those results first, then the rest of the page", async () => {
+  const app = fakeApp();
+  const many = Array.from({ length: 6 }, (_, index) => ({ id: `p${index}`, text: `Paragraph ${index}.` }));
+  const sync = new DocumentSync(app.context, { document: "page:x", kind: "page", items: many, onChange: () => {} });
+  sync.setVisible(["p4", "p1"]);
+  sync.start();
+  await until(() => app.requests.length >= 1);
+  const first = app.requests[0] as Extract<BridgeRequest, { type: "sync" }>;
+  assert.deepEqual(first.visible, ["p4", "p1"]);
+  assert.equal(first.focus, "p4");
+  // On screen first, then from the focus on, then the part above it.
+  assert.deepEqual(first.want, ["p4", "p1", "p2", "p3", "p5", "p0"]);
   sync.stop();
 });

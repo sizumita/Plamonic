@@ -44,6 +44,13 @@ static/         アイコン、サイドバーのページ（Chrome のサイド
 - **サイドバーは表示の種類で切り替える。** 機能は `view()` で `{ kind, ... }` を返し、サイドバーは `kind` に登録された
   ビューで描く。サイドバーが開いているあいだだけ、機能の更新が届く（Chrome はポート、Safari はページ内で直接）。
 
+### サイトごとの設定
+
+どのサイトをどう訳すか（自動／手動／オフ、翻訳する場所・しない場所の CSS セレクタ、翻訳先言語など）は、拡張機能では
+持たず、Plamonic の設定「Webサイト」で管理する（[DESIGN.md 9.4](../docs/DESIGN.md)）。content script はページを開くと
+アプリに設定を聞き、ページ翻訳は翻訳する場所の中だけを訳す。自動のサイトでは、メニューから一度だけそのサイトへの許可を
+求め、許可されたサイトに content script を登録する（`background/automatic-sites.ts`）。
+
 ### 機能を足すには
 
 1. `src/features/<名前>/` に `Feature` を書く（`matches`、`create`、`FeatureInstance` の `start` / `stop` / `view`）。

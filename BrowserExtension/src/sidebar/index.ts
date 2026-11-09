@@ -3,9 +3,9 @@ import { SIDEBAR_PORT, type ContentToSidebar, type SidebarToContent } from "../s
 import { SIDEBAR_STYLE, SidebarShell } from "./shell";
 
 /**
- * Chrome's side panel page. The panel stays open across tabs, so it follows the window's active tab, connects
- * to that tab's content script over a port and shows its feature's view. (Safari's sidebar lives in the page:
- * content/embedded-sidebar.ts.)
+ * Chrome's side panel page. It is opened for one tab (`?tab=<id>`, popup/index.ts) and shows that tab's
+ * feature over a port to its content script. Without `tab`, it follows the window's active tab. (Safari's
+ * sidebar lives in the page: content/embedded-sidebar.ts.)
  */
 const style = document.createElement("style");
 style.textContent = SIDEBAR_STYLE;
@@ -48,6 +48,8 @@ function connect(tab: number | undefined) {
     shell.receive(message);
   });
   connected.onDisconnect.addListener(() => {
+    // Read, so Chrome does not report it as unchecked: the tab has no content script (yet).
+    void ext.runtime.lastError;
     if (port !== connected) return;
     port = undefined;
     // No content script on this page, or it reloaded: show the status and try again shortly.
@@ -61,8 +63,13 @@ async function activeTab(): Promise<number | undefined> {
   return tab?.id;
 }
 
-void activeTab().then(connect);
-ext.tabs.onActivated.addListener(() => void activeTab().then(connect));
+const fixedTab = new URLSearchParams(location.search).get("tab");
+if (fixedTab) {
+  connect(Number(fixedTab));
+} else {
+  void activeTab().then(connect);
+  ext.tabs.onActivated.addListener(() => void activeTab().then(connect));
+}
 ext.tabs.onUpdated.addListener((id, change) => {
   if (id === tabID && change.status === "complete" && !port) connect(id);
 });

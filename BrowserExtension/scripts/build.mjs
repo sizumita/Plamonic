@@ -32,10 +32,15 @@ function manifest(browser) {
     manifest_version: 3,
     name: "Plamonic",
     version: pkg.version,
-    description: "YouTube の字幕などを、この Mac の Plamonic で翻訳します。",
+    description: "Web ページを、この Mac の Plamonic で翻訳します。翻訳は Mac の中で行い、文章を外に送りません。",
     icons,
-    action: { default_title: "Plamonic", default_icon: icons },
-    permissions: ["nativeMessaging", "storage", "scripting"],
+    action: { default_title: "Plamonic", default_icon: icons, default_popup: "popup.html" },
+    // activeTab: the toolbar menu injects the content script into the page it was opened on (page translation),
+    // so the extension needs no access to every site.
+    permissions: ["nativeMessaging", "storage", "scripting", "activeTab"],
+    // Sites set to translate by themselves in the app (Settings › Webサイト): asked for one site at a time, from
+    // the toolbar menu, never for all sites.
+    optional_host_permissions: ["*://*/*"],
     host_permissions: CONTENT_MATCHES,
     background: { service_worker: "background.js" },
     content_scripts: [{ matches: CONTENT_MATCHES, js: ["content.js"], run_at: "document_start" }],
@@ -45,6 +50,11 @@ function manifest(browser) {
     ],
   };
   if (browser === "chrome") {
+    // Chrome loads the YouTube hook into the page's own world before the player starts. (Safari has no
+    // "world": "MAIN" content scripts: the content script inserts it, features/youtube/index.ts.)
+    base.content_scripts.unshift({
+      matches: CONTENT_MATCHES, js: ["page-hook.js"], run_at: "document_start", world: "MAIN",
+    });
     base.permissions.push("sidePanel");
     base.side_panel = { default_path: "sidebar.html" };
     if (dev) base.key = SPIKE_KEY;
@@ -62,6 +72,7 @@ async function build(browser) {
       content: join(root, "src/content/index.ts"),
       "page-hook": join(root, "src/features/youtube/page-hook.ts"),
       sidebar: join(root, "src/sidebar/index.ts"),
+      popup: join(root, "src/popup/index.ts"),
     },
     outdir: out,
     bundle: true,

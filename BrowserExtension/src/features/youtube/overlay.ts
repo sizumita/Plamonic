@@ -51,8 +51,10 @@ export function ensurePlayerButton(player: HTMLElement, onClick: () => void) {
     event.stopPropagation();
     onClick();
   });
+  // Next to the captions button, which newer players nest inside a group of the controls.
   const captions = controls.querySelector(".ytp-subtitles-button");
-  controls.insertBefore(button, captions ?? controls.firstChild);
+  if (captions?.parentElement) captions.parentElement.insertBefore(button, captions);
+  else controls.prepend(button);
 }
 
 function ensureStyle() {

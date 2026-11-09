@@ -21,6 +21,8 @@ export interface SyncOptions {
   urgent?: number;
   /** Called after results or the status changed. */
   onChange: () => void;
+  /** The page, so its site's settings in the app apply (target language, context). */
+  url?: string;
 }
 
 export type SyncStatus =
@@ -41,15 +43,19 @@ export class DocumentSync {
   progress = { done: 0, total: 0 };
 
   private focus: string | undefined;
+  private visible: string[] = [];
   private sentItems = false;
   private stopped = false;
   private wake: (() => void) | undefined;
   private readonly index = new Map<string, number>();
 
+  private readonly options: SyncOptions;
+
   constructor(
     private readonly context: FeatureContext,
-    private readonly options: SyncOptions,
+    options: SyncOptions,
   ) {
+    this.options = { ...options };
     options.items.forEach((item, position) => this.index.set(item.id, position));
   }
 
@@ -72,6 +78,26 @@ export class DocumentSync {
 
   /** Asks again now, such as after the app was started. */
   retry() {
+    this.wake?.();
+  }
+
+  /** Replaces the texts (a page that grew). They are sent again with the next request; known results stay. */
+  setItems(items: SyncItem[]) {
+    this.options.items = items;
+    this.index.clear();
+    items.forEach((item, position) => this.index.set(item.id, position));
+    this.sentItems = false;
+    this.wake?.();
+  }
+
+  /**
+   * The items on screen, top to bottom (a page). The app translates them first, whatever their place in the list;
+   * the first one is the focus. Asks right away when they changed.
+   */
+  setVisible(ids: string[]) {
+    if (ids.length === this.visible.length && ids.every((id, index) => id === this.visible[index])) return;
+    this.visible = ids;
+    this.focus = ids[0] ?? this.focus;
     this.wake?.();
   }
 
@@ -100,9 +126,11 @@ export class DocumentSync {
       items: this.sentItems ? undefined : items,
       focus: this.focus,
       urgent: urgent ?? 3,
+      visible: this.visible.length ? this.visible.slice(0, 60) : undefined,
       want: this.wanted(),
       context,
       sourceLanguage,
+      url: this.options.url,
     });
     if (this.stopped) return 0;
     if (!response.ok) {
@@ -139,7 +167,9 @@ export class DocumentSync {
       changed = true;
     }
     if (changed) this.options.onChange();
-    if (this.unsettled(this.focusIndex(), LOOKAHEAD).length > 0) return 700;
+    if (this.visible.some((id) => !this.isSettled(id)) || this.unsettled(this.focusIndex(), LOOKAHEAD).length > 0) {
+      return 700;
+    }
     if (this.progress.done < this.progress.total) return 2000;
     // Everything ahead is done; keep the document alive in the app (it forgets after 5 minutes).
     return 60000;
@@ -154,18 +184,28 @@ export class DocumentSync {
     return this.focus === undefined ? 0 : (this.index.get(this.focus) ?? 0);
   }
 
-  /** Ids whose results may still change: near the focus first, then the rest ahead of it. */
+  /**
+   * Ids whose results may still change: what is on screen, then near the focus and ahead of it; for a page, then
+   * the part above too (the app reads all of it).
+   */
   private wanted(): string[] {
+    const ids = new Set(this.visible.filter((id) => !this.isSettled(id)));
     const from = Math.max(0, this.focusIndex() - 2);
-    return this.unsettled(from, MAX_WANT);
+    for (const id of this.unsettled(from, MAX_WANT)) ids.add(id);
+    if (this.options.kind === "page") for (const id of this.unsettled(0, MAX_WANT)) ids.add(id);
+    return [...ids].slice(0, MAX_WANT);
+  }
+
+  private isSettled(id: string) {
+    const state = this.results.get(id)?.state;
+    return state === "final" || state === "skipped" || state === "failed";
   }
 
   private unsettled(from: number, limit: number): string[] {
     const ids: string[] = [];
     const items = this.options.items;
     for (let position = from; position < items.length && ids.length < limit; position++) {
-      const state = this.results.get(items[position]!.id)?.state;
-      if (state !== "final" && state !== "skipped" && state !== "failed") ids.push(items[position]!.id);
+      if (!this.isSettled(items[position]!.id)) ids.push(items[position]!.id);
     }
     return ids;
   }
