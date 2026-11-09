@@ -8,7 +8,8 @@ import type { SiteInfo } from "./sites";
 export const BRIDGE_PROTOCOL = 1;
 
 export type BridgeRequest =
-  | { type: "hello" }
+  /** With `url`, `targetLanguage` is that page's (its site may override the global one). */
+  | { type: "hello"; url?: string }
   | {
       type: "sync";
       document: string;

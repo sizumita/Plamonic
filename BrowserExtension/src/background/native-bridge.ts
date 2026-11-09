@@ -19,7 +19,7 @@ export class NativeBridge {
     }
     if (response.error === "unreachable" || response.error === "appNotRunning") {
       this.setStatus({ state: "unreachable", message: response.message ?? "" });
-    } else if (request.type === "hello" && response.ok) {
+    } else if (request.type === "hello" && !request.url && response.ok) {
       this.setStatus({
         state: "connected",
         version: response.version ?? "",

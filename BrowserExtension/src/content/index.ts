@@ -86,6 +86,7 @@ class ContentHost {
     const url = location.href;
     const site = await sendRuntime<SiteInfo>({ type: "site:get", url } satisfies BackgroundMessage);
     if (location.href !== url) return;
+    const previous = this.site;
     this.site = site;
     this.siteURL = url;
     this.paused = site ? await isPaused(site.pattern) : false;
@@ -93,6 +94,15 @@ class ContentHost {
       // A single-page site moved into a part set never to translate: what was translating stops.
       for (const [id, { feature }] of [...this.running]) if (feature.followsSiteMode) this.stop(id);
       return;
+    }
+    // Another part of a single-page site with settings of its own (a path pattern): what is translating starts
+    // again with them (where to translate, target language, context).
+    if (previous && site && previous.pattern !== site.pattern) {
+      for (const [id, { feature }] of [...this.running]) {
+        if (!feature.followsSiteMode) continue;
+        this.stop(id);
+        this.start(feature);
+      }
     }
     if (site?.mode !== "automatic" || this.paused) return;
     const page = new URL(url);

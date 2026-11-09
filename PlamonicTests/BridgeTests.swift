@@ -84,6 +84,22 @@ final class BridgeTests: XCTestCase {
     }
 
     @MainActor
+    func testTextsOverTheLimitAreSkippedNotCut() async throws {
+        let long = String(repeating: "Long text. ", count: BridgeProtocol.maxItemCharacters / 10)
+        let request: [String: Any] = [
+            "type": "sync", "client": "chrome", "document": "page:x", "kind": "page", "focus": "p0",
+            "items": [["id": "p0", "text": long], ["id": "p1", "text": "Hello there, everyone."]],
+        ]
+        let line = String(decoding: try JSONSerialization.data(withJSONObject: request), as: UTF8.self)
+        let response = try await send(makeService(), line)
+        let states = (response["results"] as? [[String: Any]])?.reduce(into: [String: String]()) {
+            $0[$1["id"] as? String ?? ""] = $1["state"] as? String
+        }
+        XCTAssertEqual(states?["p0"], "skipped")
+        XCTAssertEqual(states?["p1"], "pending")
+    }
+
+    @MainActor
     func testTranslateAnswersEachText() async throws {
         let backend = TranslationFakeBackend()
         backend.fail("Broken text here", times: 9)

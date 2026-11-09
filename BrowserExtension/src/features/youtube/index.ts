@@ -164,7 +164,8 @@ class YouTubeCaptions implements FeatureInstance {
     this.channel = info.author;
     if (info.tracks.length === 0) return this.setPhase("no-captions", "この動画には字幕がありません");
 
-    const status = await this.context.bridge({ type: "hello" });
+    // The target language of this page's site: YouTube may have its own in Plamonic's settings.
+    const status = await this.context.bridge({ type: "hello", url: location.href });
     const target = status.ok && status.targetLanguage ? status.targetLanguage : "ja";
     const track = chooseSourceTrack(info.tracks, target)!;
     this.track = track;

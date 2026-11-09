@@ -133,6 +133,12 @@ final class SiteProfileTests: XCTestCase {
         let backend = TranslationFakeBackend()
         let service = service(backend, sites: [site])
 
+        // The page's target language is its site's.
+        let hello = try await send(service, #"{"type":"hello","url":"https://example.com/docs/a"}"#)
+        XCTAssertEqual(hello["targetLanguage"] as? String, "ko")
+        let elsewhere = try await send(service, #"{"type":"hello","url":"https://other.org/"}"#)
+        XCTAssertEqual(elsewhere["targetLanguage"] as? String, "ja")
+
         let answer = try await send(service, #"{"type":"site","url":"https://example.com/docs/a"}"#)
         let info = try XCTUnwrap(answer["site"] as? [String: Any])
         XCTAssertEqual(info["mode"] as? String, "automatic")

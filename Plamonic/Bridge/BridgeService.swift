@@ -46,7 +46,8 @@ final class BridgeService {
             response.app = "Plamonic"
             response.version = appVersion
             response.enabled = enabled
-            response.targetLanguage = global.targetLanguage
+            // With a page: the language its site translates into (the site may override the global one).
+            response.targetLanguage = site(of: request)?.targetLanguageOverride ?? global.targetLanguage
             response.ready = isReady(Self.documentSettings(global: global, kind: nil, context: "", sourceLanguage: nil))
             response.features = BridgeProtocol.features
             return response
@@ -129,9 +130,12 @@ final class BridgeService {
         let settings = Self.documentSettings(
             global: global, kind: request.kind, context: request.context ?? "", sourceLanguage: request.sourceLanguage,
             site: site(of: request))
+        // A text over the limit is skipped (left as it is), not cut: the page would show the translation of its
+        // beginning in place of all of it.
         let items = request.items.map { items in
             items.map {
-                TranslationCoordinator.ExternalItem(id: $0.id, text: String($0.text.prefix(BridgeProtocol.maxItemCharacters)))
+                TranslationCoordinator.ExternalItem(
+                    id: $0.id, text: $0.text.count > BridgeProtocol.maxItemCharacters ? "" : $0.text)
             }
         }
         let urgent = min(max(request.urgent ?? BridgeProtocol.defaultUrgentCount, 0), BridgeProtocol.maxUrgentCount)
