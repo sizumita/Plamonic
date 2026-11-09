@@ -91,17 +91,10 @@ final class PlamoGenerator {
         return logits[0, -1]
     }
 
-    /// Greedy generation. Mirrors mlx-lm's generate_step: prefill all but the last prompt token,
-    /// then step one token at a time with the next step queued before the current token is read.
-    func generate(
-        prompt: [Int],
-        maxNewTokens: Int,
-        onText: ((String) -> Void)? = nil
-    ) throws -> PlamoGenerationOutput {
-        precondition(!prompt.isEmpty)
-        let prefillStart = Date()
-
-        // Reuse the longest shared prefix; at least the last prompt token is always recomputed.
+    /// Feeds all prompt tokens but the last into the prompt cache, reusing the longest prefix it shares with
+    /// the cached tokens (at least the last prompt token is always recomputed). Returns the reused count.
+    /// Afterwards the cache holds exactly `prompt.dropLast()`.
+    func prefill(_ prompt: [Int]) throws -> Int {
         var reused = 0
         if reusePromptPrefix {
             let limit = min(cachedTokens.count, prompt.count - 1)
@@ -122,6 +115,24 @@ final class PlamoGenerator {
             cachedTokens += chunk
             position += n
         }
+        return reused
+    }
+
+    /// Keys and values of the prompt cache per layer, [1, heads, length, dim] (nil for an empty cache).
+    var promptCacheContents: [(keys: MLXArray, values: MLXArray)?] {
+        caches.map(\.filled)
+    }
+
+    /// Greedy generation. Mirrors mlx-lm's generate_step: prefill all but the last prompt token,
+    /// then step one token at a time with the next step queued before the current token is read.
+    func generate(
+        prompt: [Int],
+        maxNewTokens: Int,
+        onText: ((String) -> Void)? = nil
+    ) throws -> PlamoGenerationOutput {
+        precondition(!prompt.isEmpty)
+        let prefillStart = Date()
+        let reused = try prefill(prompt)
 
         func step(_ input: MLXArray) -> MLXArray {
             let hidden = model.hiddenStates(input.reshaped(1, -1), caches: caches)

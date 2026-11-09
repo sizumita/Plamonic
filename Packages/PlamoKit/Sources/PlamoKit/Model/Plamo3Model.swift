@@ -100,6 +100,23 @@ struct PlamoRotary {
         self.sin = s
     }
 
+    /// Per-row positions for a batch: row b covers `starts[b] ..< starts[b] + length`.
+    /// The tables are [B, 1, length, dim], broadcasting over the heads of [B, heads, length, dim].
+    init(invFreq: MLXArray, concentration: Float, length: Int, starts: [Int], dtype: DType) {
+        let rows = MLXArray(starts.map { Int32($0) }).asType(.float32).expandedDimensions(axis: -1)
+        let positions = MLX.arange(length, dtype: .float32).expandedDimensions(axis: 0) + rows
+        var phase = positions.expandedDimensions(axis: -1) * invFreq
+        phase = concatenated([phase, phase], axis: -1).expandedDimensions(axis: 1)
+        var c = MLX.cos(phase).asType(dtype)
+        var s = MLX.sin(phase).asType(dtype)
+        if concentration != 1 {
+            c = c * concentration
+            s = s * concentration
+        }
+        self.cos = c
+        self.sin = s
+    }
+
     func apply(_ x: MLXArray) -> MLXArray {
         if PlamoFusedOps.enabled, x.dim(-2) == 1 { return PlamoFusedOps.rope(x, cos, sin) }
         let half = x.dim(-1) / 2
@@ -278,6 +295,55 @@ final class Plamo3Model: Module {
             windowMask = fullMask
         }
 
+        return runLayers(
+            h, fullRotary: fullRotary, localRotary: localRotary, fullMask: fullMask, windowMask: windowMask,
+            caches: caches)
+    }
+
+    /// Runs the decoder for several sequences at once (`PlamoBatchGenerator`). `inputs` is [B, L]; the caches
+    /// hold B rows that all end at the same slot, row b starting after `leftPadding[b]` empty slots.
+    /// Each row gets its own positions, so a row computes what it would alone; padding is masked out.
+    func batchHiddenStates(_ inputs: MLXArray, caches: [PlamoKVCache], leftPadding: [Int]) -> MLXArray {
+        var h = model.embedTokens(inputs)
+        if config.scaleEmbedding {
+            h = h * Float(pow(Double(config.hiddenSize), 0.5))
+        }
+        let length = h.dim(1)
+        let offset = caches.first?.offset ?? 0
+        let starts = leftPadding.map { offset - $0 }
+
+        let fullRotary = PlamoRotary(
+            invFreq: invFreqFull, concentration: fullConcentration, length: length, starts: starts, dtype: h.dtype)
+        let localRotary = PlamoRotary(
+            invFreq: invFreqLocal, concentration: 1, length: length, starts: starts, dtype: h.dtype)
+
+        let fullMask: MLXFast.ScaledDotProductAttentionMaskMode
+        let windowMask: MLXFast.ScaledDotProductAttentionMaskMode
+        let windowed = offset + length > config.windowSize
+        if leftPadding.allSatisfy({ $0 == 0 }) {
+            // Same masks as a single sequence.
+            fullMask = length > 1 ? .causal : .none
+            windowMask =
+                windowed
+                ? .array(Self.windowedCausalMask(length: length, offset: offset, window: config.windowSize))
+                : fullMask
+        } else {
+            let masks = Self.paddedMasks(
+                length: length, offset: offset, leftPadding: leftPadding, window: windowed ? config.windowSize : nil)
+            fullMask = .array(masks.full)
+            windowMask = .array(masks.window)
+        }
+        return runLayers(
+            h, fullRotary: fullRotary, localRotary: localRotary, fullMask: fullMask, windowMask: windowMask,
+            caches: caches)
+    }
+
+    private func runLayers(
+        _ input: MLXArray, fullRotary: PlamoRotary, localRotary: PlamoRotary,
+        fullMask: MLXFast.ScaledDotProductAttentionMaskMode, windowMask: MLXFast.ScaledDotProductAttentionMaskMode,
+        caches: [PlamoKVCache]?
+    ) -> MLXArray {
+        var h = input
         for (i, layer) in layers.enumerated() {
             h = layer(
                 h,
@@ -306,5 +372,23 @@ final class Plamo3Model: Module {
         let rinds = MLX.arange(offset + length).expandedDimensions(axis: 0)
         let linds = MLX.arange(offset, offset + length).expandedDimensions(axis: 1)
         return (linds .>= rinds) .&& (linds .< (rinds + Int32(window)))
+    }
+
+    /// [B, 1, length, offset + length] masks for left-padded rows: a key slot is visible when it is not padding,
+    /// not after the query (causal) and, for `window`, less than `window` slots before it.
+    /// Padding shifts a row's slots and positions alike, so the window holds the same keys as without it.
+    static func paddedMasks(length: Int, offset: Int, leftPadding: [Int], window: Int?)
+        -> (full: MLXArray, window: MLXArray)
+    {
+        let total = offset + length
+        let keys = MLX.arange(total).reshaped(1, 1, 1, total)
+        let pads = MLXArray(leftPadding.map { Int32($0) }).reshaped(leftPadding.count, 1, 1, 1)
+        var full = keys .>= pads
+        let queries = MLX.arange(offset, total).reshaped(1, 1, length, 1)
+        if length > 1 {
+            full = full .&& (queries .>= keys)
+        }
+        guard let window else { return (full, full) }
+        return (full, full .&& (queries .< (keys + Int32(window))))
     }
 }

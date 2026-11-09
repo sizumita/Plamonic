@@ -21,6 +21,8 @@ final class TranslationFakeBackend: TranslationBackend, @unchecked Sendable {
     private var _completed: [Call] = []
     private var _active = 0
     private var _maxActive = 0
+    private var _activeModels: [ModelSize: Int] = [:]
+    private var _mixedModels = false
 
     init(
         installed: Set<ModelSize> = [.b0_8, .b2],
@@ -58,6 +60,8 @@ final class TranslationFakeBackend: TranslationBackend, @unchecked Sendable {
     var calls: [Call] { locked { _calls } }
     var completedCalls: [Call] { locked { _completed } }
     var maxConcurrentCalls: Int { locked { _maxActive } }
+    /// true when calls with different models ever ran at the same time.
+    var ranModelsTogether: Bool { locked { _mixedModels } }
 
     func calls(for text: String) -> [Call] { calls.filter { $0.request.text == text } }
 
@@ -70,6 +74,8 @@ final class TranslationFakeBackend: TranslationBackend, @unchecked Sendable {
             _calls.append(call)
             _active += 1
             _maxActive = max(_maxActive, _active)
+            _activeModels[model, default: 0] += 1
+            if _activeModels.values.filter({ $0 > 0 }).count > 1 { _mixedModels = true }
             var fail = false
             if let remaining = _failures[request.text], remaining > 0 {
                 _failures[request.text] = remaining - 1
@@ -77,7 +83,12 @@ final class TranslationFakeBackend: TranslationBackend, @unchecked Sendable {
             }
             return (_latency[model] ?? 0.01, _partialSteps, _partialStepInterval, fail)
         }
-        defer { locked { _active -= 1 } }
+        defer {
+            locked {
+                _active -= 1
+                _activeModels[model, default: 1] -= 1
+            }
+        }
 
         let output = responder?(request.text, model) ?? Self.output(for: request.text, model: model)
         if steps > 0 {
@@ -149,6 +160,8 @@ enum TranslationTestFixtures {
         configuration.installCheckInterval = 0
         configuration.retryBackoff = 0.3
         configuration.maxRetryBackoff = 0.6
+        // One call at a time keeps the call order of most tests exact; the concurrency tests raise it.
+        configuration.maxConcurrentJobs = 1
         return configuration
     }
 
