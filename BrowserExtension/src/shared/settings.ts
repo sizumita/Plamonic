@@ -2,7 +2,10 @@ import { ext } from "./api";
 
 /** The extension's own settings, shared by every part of it (storage.local). */
 export interface Settings {
-  /** What the video shows: the translation instead of the captions, both, or YouTube's own captions. */
+  /**
+   * What the video shows: the translation instead of the captions, both, or YouTube's own captions (the default;
+   * the translation is then in the sidebar).
+   */
   captionOverlay: "translation" | "both" | "off";
   /** The sidebar's transcript also shows the original under each line. */
   sidebarShowsOriginal: boolean;
@@ -11,7 +14,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  captionOverlay: "translation",
+  captionOverlay: "off",
   sidebarShowsOriginal: true,
   sidebarAutoScroll: true,
 };

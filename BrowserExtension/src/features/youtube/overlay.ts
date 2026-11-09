@@ -69,7 +69,7 @@ export class CaptionOverlay {
   private element: HTMLDivElement | undefined;
   private player: HTMLElement | undefined;
   private resize: ResizeObserver | undefined;
-  private mode: Settings["captionOverlay"] = "translation";
+  private mode: Settings["captionOverlay"] = "off";
   private line: OverlayLine | null = null;
 
   attach(player: HTMLElement) {

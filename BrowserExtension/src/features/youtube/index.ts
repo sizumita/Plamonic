@@ -49,15 +49,34 @@ class YouTubeCaptions implements FeatureInstance {
   private readonly onMessage = (event: MessageEvent) => this.hookMessage(event);
   private readonly onTime = () => this.updateTime();
   private buttonTimer: ReturnType<typeof setInterval> | undefined;
+  /** The captions are being found and translated (they start only when shown, or for the sidebar). */
+  private begun = false;
+  /** We switched YouTube's captions on to get the player's token; switched back off if the video shows them. */
+  private captionsSwitchedOn = false;
 
   constructor(private readonly context: FeatureContext) {}
 
+  /**
+   * Listens to the page hook at once (the player's own caption request, when captions are on, saves switching
+   * them), but finds and translates the captions only when they are to be seen: over the video (the menu's 動画の
+   * 字幕) or in the sidebar. With YouTube's own captions (the default) and no sidebar, the app does nothing.
+   */
   start() {
     addEventListener("message", this.onMessage);
     if (!this.video) return;
     this.keepPlayerButton();
-    this.phase = "loading";
+    if (this.context.settings().captionOverlay !== "off") this.begin();
+  }
+
+  private begin() {
+    if (this.begun || !this.video || this.stopped) return;
+    this.begun = true;
+    this.setPhase("loading");
     void this.load().catch((error) => this.fail(String(error?.message ?? error)));
+  }
+
+  sidebarOpened() {
+    this.begin();
   }
 
   stop() {
@@ -76,6 +95,7 @@ class YouTubeCaptions implements FeatureInstance {
 
   settingsChanged(settings: Settings) {
     this.overlay.setMode(settings.captionOverlay);
+    if (settings.captionOverlay !== "off") this.begin();
   }
 
   /** The toolbar menu: what the video shows. */
@@ -151,6 +171,7 @@ class YouTubeCaptions implements FeatureInstance {
 
     const playerURL = await this.playerCaptionURL();
     if (this.stopped) return;
+    this.restoreCaptions();
     const response = await fetch(trackURL(playerURL, track), { credentials: "include" });
     const text = await response.text();
     if (!text) throw new Error("字幕を取得できませんでした");
@@ -242,7 +263,7 @@ class YouTubeCaptions implements FeatureInstance {
   }
 
   private toggleCaptions() {
-    const button = document.querySelector<HTMLButtonElement>("#movie_player .ytp-subtitles-button");
+    const button = this.captionsButton();
     if (!button) return;
     if (button.getAttribute("aria-pressed") === "true") {
       button.click();
@@ -251,7 +272,20 @@ class YouTubeCaptions implements FeatureInstance {
       }, 300);
     } else {
       button.click();
+      this.captionsSwitchedOn = true;
     }
+  }
+
+  /** YouTube's captions go back off if we switched them on and the video is to show YouTube's own (they were off). */
+  private restoreCaptions() {
+    if (!this.captionsSwitchedOn || this.context.settings().captionOverlay !== "off") return;
+    this.captionsSwitchedOn = false;
+    const button = this.captionsButton();
+    if (button?.getAttribute("aria-pressed") === "true") button.click();
+  }
+
+  private captionsButton() {
+    return document.querySelector<HTMLButtonElement>("#movie_player .ytp-subtitles-button");
   }
 
   private hookMessage(event: MessageEvent) {

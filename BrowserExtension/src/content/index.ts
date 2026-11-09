@@ -236,6 +236,7 @@ class ContentHost {
       this.embeddedShell = { shell, connection };
       await this.embedded.open(shell);
       this.connections.add(connection);
+      this.sidebarOpened();
       shell.show(this.view());
     } catch (error) {
       this.closeEmbedded();
@@ -261,7 +262,12 @@ class ContentHost {
     port.onMessage.addListener((message: SidebarToContent) => {
       if (message.type === "command") this.command(message.command, message.args);
     });
+    this.sidebarOpened();
     connection.post({ type: "view", view: this.view() });
+  }
+
+  private sidebarOpened() {
+    for (const { instance } of this.running.values()) instance.sidebarOpened?.();
   }
 
   private scheduleView() {

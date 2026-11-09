@@ -43,6 +43,8 @@ export interface FeatureInstance {
   perform?(action: string, value?: string): void;
   /** A command from the sidebar's view, such as "seek". */
   command?(command: string, args: unknown): void;
+  /** A sidebar opened for this tab (a feature may wait for one before doing work only it shows). */
+  sidebarOpened?(): void;
   settingsChanged?(settings: Settings): void;
 }
 
