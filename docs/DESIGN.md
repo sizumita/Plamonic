@@ -862,6 +862,8 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
   拡張機能は `items` を付けて送り直す。
 - `kind: "captions"` は 1 本の話の続きなので、直前の行の訳を会話履歴として渡す。`"page"`（ほかの値も）は渡さず、
   先読みはページ全体（focus より前も）に及ぶ。
+- ページの段落のリンクと書式は、拡張機能が `[文字](番号)` の印（6.1 と同じ）と改行にして `text` に入れ、訳文から
+  組み直す（[BrowserExtension/README.md](../BrowserExtension/README.md)）。アプリはふつうの文章として訳す。
   `context`（動画のタイトルとチャンネルなど）は PFML3 の context に、`sourceLanguage`（BCP 47）は PLaMo の言語コードに
   直せるときだけ翻訳元言語にする。
 - Safari の `sendNativeMessage` は 1 回の依頼に 1 回答えるだけなので、結果は拡張機能が取りに来る（ポーリング）。
