@@ -104,8 +104,15 @@ AXGroup dom=scroll-view → AXGroup/AXLandmarkRegion dom=scroll-view__viewport  
  ├ AXGroup dom=pointer-events-none,sticky,top-0   ヘッダ（除外）
  └ AXGroup ... 段落ごとの AXGroup（子: AXStaticText, AXGroup/AXCodeStyleGroup(インラインコード),
                 AXGroup/AXStrongStyleGroup(太字), AXList/AXContentList + AXListMarker）
-    └ AXGroup dom=tool-collapsible  ツール実行（除外）
+    └ AXGroup dom=tool-collapsible  思考やツールの折りたたみ領域
+       ├ AXButton                 開閉ボタン（既定では翻訳しない）
+       └ AXGroup → 段落            展開すると現れる本文（翻訳対象）
 ```
+
+OpenCode 2.2.5 では、思考もツールと同じ `tool-collapsible` を使う。
+このクラスを除外すると展開した思考の本文まで読み飛ばすため、除外しない。
+展開された領域の可視段落を読み、閉じた領域の本文は読み取らない。
+開いたツールの説明文も対象となり、コードらしい文章には通常のコード判定を適用する。
 
 ## DeepSeek Harness（com.deepseek.dsh）
 

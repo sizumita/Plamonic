@@ -104,7 +104,7 @@ Plamonic のインストールから、使い方、設定、うまく動かな�
 | Slack | メッセージ本文（`p-rich_text_section` / `list` / `quote`）。コードブロック、送信者、時刻は除外 | 動作確認済み |
 | Discord | メッセージ本文（`messageContent_`）と埋め込みの説明。返信のプレビュー、「(編集済)」、コードは除外 | 動作確認済み |
 | Claude（Claude Code タブ） | チャット欄（`epitaxy-chat-panel-body`）の中のメッセージ行（`group/message-row`）。ツール実行の表示は除外。チャット欄がない画面（チャットタブ）ではウインドウ全体からメッセージを探します（未検証） | 動作確認済み |
-| OpenCode（デスクトップ版） | 本文領域（`scroll-view__viewport`）の段落。ツール実行と固定ヘッダは除外 | 動作確認済み |
+| OpenCode（デスクトップ版） | 本文領域（`scroll-view__viewport`）の段落と、展開した思考の本文。開いたツールの説明文も対象。操作ボタンと固定ヘッダは除外 | 動作確認済み |
 | Codex（デスクトップ版） | Web チャット向けの汎用ルール | 未検証 |
 | DeepSeek Harness | Web チャット向けの汎用ルール | 未検証 |
 | ターミナル（Terminal.app） | 見えている行だけを読み、折り返しを段落に戻し、罫線・スピナー・プロンプト・ツール呼び出しの行は除外。Claude Code / Codex / OpenCode の CLI 向け | 動作確認済み |
