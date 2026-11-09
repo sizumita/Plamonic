@@ -10,6 +10,14 @@ const SKIPPED_TAGS = new Set([
   "SVG", "MATH", "CANVAS", "VIDEO", "AUDIO", "IFRAME", "OBJECT", "HEAD", "TITLE",
 ]);
 
+/**
+ * Parts that must survive inside a paragraph: translating replaces the paragraph's children, so a paragraph holding
+ * one of these is left as it is. (Inline code is not among them: it is part of ordinary sentences, and restoring
+ * the page puts it back.)
+ */
+const PROTECTED_INSIDE =
+  'input, textarea, select, [translate="no"], .notranslate, [contenteditable]:not([contenteditable="false"])';
+
 /** At most this many paragraphs per page. */
 export const MAX_BLOCKS = 3000;
 
@@ -90,7 +98,8 @@ export class BlockFinder {
   }
 
   private isWanted(block: Element): boolean {
-    if (this.exclude && block.closest(this.exclude)) return false;
+    if (this.exclude && (block.closest(this.exclude) || block.querySelector(this.exclude))) return false;
+    if (block.querySelector(PROTECTED_INSIDE)) return false;
     return !this.include || block.closest(this.include) !== null;
   }
 

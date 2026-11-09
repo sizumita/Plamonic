@@ -142,3 +142,27 @@ test("texts changed while a request is out are sent with the next one", async ()
   assert.equal(second.items?.length, 4);
   sync.stop();
 });
+
+test("keeps asking for texts that failed, since the app tries them again", async () => {
+  const app = fakeApp();
+  const bridge = app.context.bridge;
+  let calls = 0;
+  // The first answer says "b" failed (the app is backing off); later ones have it translated.
+  app.context.bridge = async (request) => {
+    const response = await bridge(request);
+    if (request.type === "sync" && calls++ === 0 && response.ok) {
+      response.results = response.results?.map((result) =>
+        result.id === "b" ? { id: "b", state: "failed" as const } : result,
+      );
+    }
+    return response;
+  };
+  const sync = new DocumentSync(app.context, { document: "yt:x", kind: "captions", items, onChange: () => {} });
+  sync.start();
+  await until(() => sync.results.get("b")?.state === "failed");
+  sync.retry();
+  await until(() => sync.results.get("b")?.state === "final");
+  const second = app.requests[1] as Extract<BridgeRequest, { type: "sync" }>;
+  assert.ok(second.want?.includes("b"));
+  sync.stop();
+});

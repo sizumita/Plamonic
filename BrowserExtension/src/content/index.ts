@@ -89,6 +89,11 @@ class ContentHost {
     this.site = site;
     this.siteURL = url;
     this.paused = site ? await isPaused(site.pattern) : false;
+    if (site?.mode === "off") {
+      // A single-page site moved into a part set never to translate: what was translating stops.
+      for (const [id, { feature }] of [...this.running]) if (feature.followsSiteMode) this.stop(id);
+      return;
+    }
     if (site?.mode !== "automatic" || this.paused) return;
     const page = new URL(url);
     for (const feature of FEATURES) {

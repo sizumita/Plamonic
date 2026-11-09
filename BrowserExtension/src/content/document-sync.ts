@@ -178,10 +178,13 @@ export class DocumentSync {
       changed = true;
     }
     if (changed) this.options.onChange();
-    if (this.visible.some((id) => !this.isSettled(id)) || this.unsettled(this.focusIndex(), LOOKAHEAD).length > 0) {
+    const working = (id: string) => this.results.get(id)?.state !== "failed";
+    if (this.visible.some((id) => !this.isSettled(id) && working(id)) || this.unsettled(this.focusIndex(), LOOKAHEAD).some(working)) {
       return 700;
     }
     if (this.progress.done < this.progress.total) return 2000;
+    // Failed texts: the app tries them again after a back-off (30 s at first), so look now and then.
+    if (this.wanted().length > 0) return 10000;
     // Everything ahead is done; keep the document alive in the app (it forgets after 5 minutes).
     return 60000;
   }
@@ -207,9 +210,10 @@ export class DocumentSync {
     return [...ids].slice(0, MAX_WANT);
   }
 
+  /** No longer changes. "failed" is not: the app retries failed texts after a back-off. */
   private isSettled(id: string) {
     const state = this.results.get(id)?.state;
-    return state === "final" || state === "skipped" || state === "failed";
+    return state === "final" || state === "skipped";
   }
 
   private unsettled(from: number, limit: number): string[] {
