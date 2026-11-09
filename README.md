@@ -186,7 +186,7 @@ Copyright (C) 2026 sizumita.
 Plamonic は [GNU Affero General Public License v3.0 only](LICENSE)（`AGPL-3.0-only`）のもとで公開しているフリーソフトウェアです。
 Plamonic に含まれる、またはビルドに使うサードパーティのコードは、それぞれのライセンスに従います。一覧は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にまとめています。
 
-PlamoKit のうち PLaMo 3 Translate のモデルのリポジトリから移植した部分と、モデルで作ったテストデータには、PLaMo Community License（[日本語](LICENSES/PLaMo-Community-License.ja.txt)、[英語](LICENSES/PLaMo-Community-License.txt)）も適用されます。
+PlamoKit のうち PLaMo 3 Translate のモデルのリポジトリから移植した部分と、モデルで作ったテストデータには、PLaMo Community License（[日本語](LICENSES/PLaMo-Community-License.ja.txt)、[英語](LICENSES/PLaMo-Community-License.txt)）も適用されます。このテストデータを使って学習したモデルにも、PLaMo Community License の条件が適用されます。
 
 PLaMo 3 Translate のモデルは Plamonic には含まれません。Plamonic は Hugging Face からモデルをダウンロードします。モデルは Preferred Networks が PLaMo Community License のもとで公開しています。
 
