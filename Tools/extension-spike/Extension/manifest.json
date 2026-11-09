@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Plamonic Spike",
+  "description": "Checks that YouTube captions can be captured and passed to a Mac app, in Safari and Chrome.",
+  "version": "0.0.1",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0EogWWDRTAWsRWbtbWPDgPiGtcU0bS1F11g8EnI4p/IBR+hfz5xNwIjx46XYt9vaUcC3Y7fGtgaOVEJEd2wfeo+6iqFc8g2U9m+S0BDNN5KCBKGWPUWaWlsLl81GuwPpRf8EZp/T0X0Ron0bBJPr+1d495+Br8y3Usq8RMkdZJaO63ofNACM6XhoFHfVwF6cg3B5E6GlZKZWK0GSAuMW5th3iNKKp7HC7Xalzn/HmmtuEXyUaCOLICkdTvLp4pmm+bcZetWwY2NhgU5HAb7vhGPekhZwoL4ZI8VMgB1zrTvWTTPfYhJz5jK+YkQrDzZ/eZhrYUzGY7z5AwD6VbcYsQIDAQAB",
+  "permissions": ["nativeMessaging", "scripting"],
+  "host_permissions": ["https://www.youtube.com/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["page-hook.js"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ]
+}

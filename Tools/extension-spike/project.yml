@@ -1,0 +1,78 @@
+# Throwaway project for checking the Safari/Chrome extension plumbing before building it into Plamonic.
+# Build with Tools/extension-spike/build.sh.
+name: PlamonicSpike
+options:
+  bundleIdPrefix: io.smdr
+  deploymentTarget:
+    macOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    ARCHS: arm64
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: NBDP5VK335
+    CODE_SIGN_IDENTITY: $(SPIKE_SIGN_IDENTITY)
+    ENABLE_HARDENED_RUNTIME: YES
+    OTHER_CODE_SIGN_FLAGS: --timestamp
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+targets:
+  PlamonicSpike:
+    type: application
+    platform: macOS
+    sources: [Host, Shared]
+    dependencies:
+      - target: PlamonicSpikeSafariExtension
+        embed: true
+      - target: plamonic-spike-native-host
+        embed: true
+        copy:
+          destination: executables
+    info:
+      path: build/Host-Info.plist
+      properties:
+        CFBundleDisplayName: Plamonic Spike
+        LSMinimumSystemVersion: "15.0"
+    entitlements:
+      path: build/Host.entitlements
+      properties:
+        com.apple.security.application-groups: [NBDP5VK335.io.smdr.Plamonic]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.smdr.PlamonicSpike
+        GENERATE_INFOPLIST_FILE: NO
+  PlamonicSpikeSafariExtension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - SafariExtension
+      - Shared
+    # The same files Chrome loads, copied into the extension's Resources keeping their folders (icons/).
+    # SPIKE_EXTENSION_DIR: Extension (the spike's own) or ../../BrowserExtension/dist/safari (build.sh sets it).
+    postCompileScripts:
+      - name: Copy the web extension
+        script: ditto "${SRCROOT}/${SPIKE_EXTENSION_DIR}" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+        basedOnDependencyAnalysis: false
+    info:
+      path: build/SafariExtension-Info.plist
+      properties:
+        CFBundleDisplayName: Plamonic Spike
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.Safari.web-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SafariWebExtensionHandler
+    entitlements:
+      path: build/SafariExtension.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups: [NBDP5VK335.io.smdr.Plamonic]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.smdr.PlamonicSpike.SafariExtension
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        GENERATE_INFOPLIST_FILE: NO
+  plamonic-spike-native-host:
+    type: tool
+    platform: macOS
+    sources: [NativeHost, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.smdr.PlamonicSpike.NativeHost
