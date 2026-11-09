@@ -94,7 +94,7 @@ class YouTubeCaptions implements FeatureInstance {
   }
 
   settingsChanged(settings: Settings) {
-    this.overlay.setMode(settings.captionOverlay);
+    this.overlay.setMode(this.overlayMode(settings));
     if (settings.captionOverlay !== "off") this.begin();
   }
 
@@ -196,7 +196,7 @@ class YouTubeCaptions implements FeatureInstance {
       });
       this.setPhase("ready");
     }
-    this.overlay.setMode(this.context.settings().captionOverlay);
+    this.overlay.setMode(this.overlayMode(this.context.settings()));
     this.watchVideo();
     this.sync?.start();
   }
@@ -371,6 +371,14 @@ class YouTubeCaptions implements FeatureInstance {
     this.frame = video.paused ? undefined : requestAnimationFrame(() => this.updateTime());
   }
 
+  /**
+   * What the video shows: the setting, except for captions already in the target language, where YouTube's own
+   * captions stay (there is no translation to show in their place).
+   */
+  private overlayMode(settings: Settings): Settings["captionOverlay"] {
+    return this.phase === "same-language" ? "off" : settings.captionOverlay;
+  }
+
   private renderOverlay() {
     const segment = this.segments[this.activeIndex];
     if (!segment || this.phase === "same-language") {
@@ -385,7 +393,7 @@ class YouTubeCaptions implements FeatureInstance {
       document.getElementById("movie_player")?.classList.remove("plamonic-captions-active");
       return;
     }
-    this.overlay.setMode(this.context.settings().captionOverlay);
+    this.overlay.setMode(this.overlayMode(this.context.settings()));
     this.overlay.show({ translation: translation ?? "", original: segment.text, pending: !translation });
   }
 }

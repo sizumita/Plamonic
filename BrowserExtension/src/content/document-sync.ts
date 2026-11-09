@@ -12,6 +12,10 @@ export interface SyncItem {
 }
 
 export interface SyncOptions {
+  /**
+   * What the document is (a video's track, a page's address). Each DocumentSync adds its own suffix, so two tabs
+   * on the same page are two documents in the app: their texts and ids may differ.
+   */
   document: string;
   kind: "captions" | "page";
   items: SyncItem[];
@@ -44,18 +48,23 @@ export class DocumentSync {
 
   private focus: string | undefined;
   private visible: string[] = [];
-  private sentItems = false;
+  /** Bumped when the texts change; the app has the texts when `sentRevision` is the current one. */
+  private itemsRevision = 0;
+  private sentRevision = -1;
   private stopped = false;
   private wake: (() => void) | undefined;
   private readonly index = new Map<string, number>();
 
   private readonly options: SyncOptions;
+  /** The document's id in the app: `options.document` and this instance's suffix (within the app's 512). */
+  private readonly documentId: string;
 
   constructor(
     private readonly context: FeatureContext,
     options: SyncOptions,
   ) {
     this.options = { ...options };
+    this.documentId = `${options.document.slice(0, 490)}#${instanceSuffix()}`;
     options.items.forEach((item, position) => this.index.set(item.id, position));
   }
 
@@ -66,7 +75,7 @@ export class DocumentSync {
   stop() {
     this.stopped = true;
     this.wake?.();
-    if (this.sentItems) void this.context.bridge({ type: "close", document: this.options.document });
+    if (this.sentRevision >= 0) void this.context.bridge({ type: "close", document: this.documentId });
   }
 
   /** The item being shown (or about to be). Polls right away when it moved. */
@@ -86,7 +95,7 @@ export class DocumentSync {
     this.options.items = items;
     this.index.clear();
     items.forEach((item, position) => this.index.set(item.id, position));
-    this.sentItems = false;
+    this.itemsRevision++;
     this.wake?.();
   }
 
@@ -118,12 +127,14 @@ export class DocumentSync {
 
   /** One request; returns how long to wait before the next. */
   private async poll(): Promise<number> {
-    const { document, kind, items, context, sourceLanguage, urgent } = this.options;
+    const { kind, items, context, sourceLanguage, urgent } = this.options;
+    // Texts that change while this request is out are sent with the next one (the revision still differs then).
+    const revision = this.itemsRevision;
     const response = await this.context.bridge({
       type: "sync",
-      document,
+      document: this.documentId,
       kind,
-      items: this.sentItems ? undefined : items,
+      items: this.sentRevision === revision ? undefined : items,
       focus: this.focus,
       urgent: urgent ?? 3,
       visible: this.visible.length ? this.visible.slice(0, 60) : undefined,
@@ -137,14 +148,14 @@ export class DocumentSync {
       switch (response.error) {
         case "unknownDocument":
           // The app restarted or forgot the document: send the texts again right away.
-          this.sentItems = false;
+          this.sentRevision = -1;
           return 0;
         case "disabled":
           this.setStatus({ state: "disabled", message: response.message ?? "" });
           return 5000;
         case "appNotRunning":
         case "unreachable":
-          this.sentItems = false;
+          this.sentRevision = -1;
           this.setStatus({ state: "unreachable", message: response.message ?? "" });
           return 5000;
         default:
@@ -152,7 +163,7 @@ export class DocumentSync {
           return 10000;
       }
     }
-    this.sentItems = true;
+    this.sentRevision = Math.max(this.sentRevision, revision);
     let changed = this.status.state !== "ok";
     this.status = { state: "ok" };
     for (const result of response.results ?? []) {
@@ -209,4 +220,11 @@ export class DocumentSync {
     }
     return ids;
   }
+}
+
+/** A short random suffix that tells this page's document from another tab's. */
+function instanceSuffix(): string {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }

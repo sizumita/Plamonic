@@ -107,3 +107,38 @@ test("a page sends what is on screen, and asks for those results first, then the
   assert.deepEqual(first.want, ["p4", "p1", "p2", "p3", "p5", "p0"]);
   sync.stop();
 });
+
+test("two tabs on the same page are two documents in the app", async () => {
+  const app = fakeApp();
+  const one = new DocumentSync(app.context, { document: "page:x", kind: "page", items, onChange: () => {} });
+  const two = new DocumentSync(app.context, { document: "page:x", kind: "page", items, onChange: () => {} });
+  one.start();
+  two.start();
+  await until(() => app.requests.length >= 2);
+  const ids = new Set(app.requests.map((request) => (request as { document?: string }).document));
+  assert.equal(ids.size, 2);
+  for (const id of ids) assert.ok(id?.startsWith("page:x#"));
+  one.stop();
+  two.stop();
+});
+
+test("texts changed while a request is out are sent with the next one", async () => {
+  const app = fakeApp();
+  let release: () => void = () => {};
+  const bridge = app.context.bridge;
+  // The first request waits until the texts have changed.
+  app.context.bridge = async (request) => {
+    if (app.requests.length === 0) await new Promise<void>((resolve) => (release = resolve));
+    return bridge(request);
+  };
+  const sync = new DocumentSync(app.context, { document: "page:x", kind: "page", items, onChange: () => {} });
+  sync.start();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const grown = [...items, { id: "d", text: "Fourth line." }];
+  sync.setItems(grown);
+  release();
+  await until(() => app.requests.length >= 2);
+  const second = app.requests[1] as Extract<BridgeRequest, { type: "sync" }>;
+  assert.equal(second.items?.length, 4);
+  sync.stop();
+});

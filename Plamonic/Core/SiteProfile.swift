@@ -78,10 +78,9 @@ enum SitePattern {
         return (parts.wildcard ? 0 : 10_000) + parts.host.count * 10 + parts.path.count * 100
     }
 
-    /// The pattern for a page's site, for a new profile: its host without "www.".
+    /// The pattern for a page's site, for a new profile: its host, as it is. Dropping "www." would make a pattern
+    /// that no longer matches the page (a host without "*." matches only itself).
     static func suggested(for url: URL) -> String? {
-        guard var host = url.host()?.lowercased() else { return nil }
-        if host.hasPrefix("www.") { host.removeFirst(4) }
-        return host
+        url.host()?.lowercased()
     }
 }

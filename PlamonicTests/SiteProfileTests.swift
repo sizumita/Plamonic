@@ -20,7 +20,7 @@ final class SiteProfileTests: XCTestCase {
         XCTAssertNotNil(SitePattern.specificity("HTTPS://Example.com", url: url("https://example.com/a")))
         XCTAssertNil(SitePattern.parse("exa mple.com"))
         XCTAssertNil(SitePattern.parse("*"))
-        XCTAssertEqual(SitePattern.suggested(for: url("https://www.example.com/a")), "example.com")
+        XCTAssertEqual(SitePattern.suggested(for: url("https://www.example.com/a")), "www.example.com")
     }
 
     func testTheMostSpecificProfileWinsAndUnknownSitesAreManual() {
@@ -44,7 +44,7 @@ final class SiteProfileTests: XCTestCase {
         let unknown = snapshot.siteProfile(for: url("https://www.example.com/post"))
         XCTAssertEqual(unknown.source, .defaults)
         XCTAssertEqual(unknown.profile.mode, .manual)
-        XCTAssertEqual(unknown.profile.pattern, "example.com")
+        XCTAssertEqual(unknown.profile.pattern, "www.example.com")
         XCTAssertTrue(unknown.profile.includeSelectors.isEmpty)
     }
 
@@ -92,8 +92,10 @@ final class SiteProfileTests: XCTestCase {
     func testTheMenuCanSetASitesModeInTheSettings() throws {
         let store = SettingsStore(fileURL: F.temporaryFileURL("settings.json"))
         let site = store.setSiteMode(.automatic, for: url("https://www.example.com/post/1"))
-        XCTAssertEqual(site.pattern, "example.com")
-        XCTAssertEqual(store.snapshot.userSite("example.com")?.mode, .automatic)
+        XCTAssertEqual(site.pattern, "www.example.com")
+        XCTAssertEqual(store.snapshot.userSite("www.example.com")?.mode, .automatic)
+        // The new profile is the one the page (and the site's other pages) get from now on.
+        XCTAssertEqual(store.snapshot.siteProfile(for: url("https://www.example.com/other")).profile.mode, .automatic)
         // A preset site keeps its places; only the mode changes.
         let reddit = store.setSiteMode(.automatic, for: url("https://www.reddit.com/r/swift"))
         XCTAssertEqual(reddit.pattern, "*.reddit.com")
