@@ -51,6 +51,12 @@ targets:
       # Contents/PlugIns: Safari finds the extension in the app (DESIGN §9).
       - target: PlamonicSafariExtension
         embed: true
+      # Contents/Helpers: Chrome's native messaging host; the app registers it with the browsers at launch.
+      - target: plamonic-chrome-host
+        embed: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     info:
       path: Plamonic/Resources/Info.plist
       properties:
@@ -121,6 +127,21 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         # The build phase reads BrowserExtension/ and may run Node there.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+  # Chrome's half of the bridge: a host Chromium browsers start for the extension's native messages, which it
+  # forwards to the app's socket (DESIGN §9.1).
+  plamonic-chrome-host:
+    type: tool
+    platform: macOS
+    sources:
+      - PlamonicChromeHost
+      - Plamonic/Bridge/BridgeClient.swift
+      - Plamonic/Bridge/BridgeLocation.swift
+      - Plamonic/Bridge/NativeMessaging.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.smdr.Plamonic.ChromeHost
+        PRODUCT_NAME: plamonic-chrome-host
+        SKIP_INSTALL: YES
   PlamonicTests:
     type: bundle.unit-test
     platform: macOS

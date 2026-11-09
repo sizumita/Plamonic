@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Signs Plamonic.app from the inside out for distribution, with the hardened runtime and a secure timestamp, as
 # notarization requires: Sparkle's helpers (as Sparkle's documentation lists them), then every framework and library
-# in Contents/Frameworks, then every app extension in Contents/PlugIns with its own entitlements
-# (PlugIns/<name>.appex is signed with <name>/<name>.entitlements in the repository), then the app with its
-# entitlements.
+# in Contents/Frameworks, then every helper tool in Contents/Helpers, then every app extension in Contents/PlugIns
+# with its own entitlements (PlugIns/<name>.appex is signed with <name>/<name>.entitlements in the repository), then
+# the app with its entitlements.
 #
 #   scripts/sign-app.sh APP IDENTITY ENTITLEMENTS [KEYCHAIN]
 #
@@ -52,6 +52,13 @@ sign "$sparkle/Updater.app"
 while IFS= read -r -d '' item; do
   sign "$item"
 done < <(find "$frameworks" -mindepth 1 -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print0)
+
+helpers="$app/Contents/Helpers"
+if [[ -d "$helpers" ]]; then
+  while IFS= read -r -d '' helper; do
+    sign "$helper"
+  done < <(find "$helpers" -mindepth 1 -maxdepth 1 -type f -perm -u+x -print0)
+fi
 
 plugins="$app/Contents/PlugIns"
 if [[ -d "$plugins" ]]; then

@@ -175,6 +175,10 @@ jobs:
             echo "::error::The app does not embed the Safari extension with its web extension."
             exit 1
           fi
+          if [[ ! -x "${app}/Contents/Helpers/plamonic-chrome-host" ]]; then
+            echo "::error::The app does not embed the Chrome native messaging host."
+            exit 1
+          fi
           echo "Architectures: $(lipo -archs "${app}/Contents/MacOS/Plamonic")"
           ditto -c -k --sequesterRsrc --keepParent "${app}" "${RUNNER_TEMP}/Plamonic.app.zip"
 

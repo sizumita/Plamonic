@@ -18,7 +18,8 @@ npm test             # 字幕の読み取り、文のまとめ方、トラック
 npm run typecheck
 ```
 
-- Chrome: `chrome://extensions` のデベロッパーモードで `dist/chrome` を読み込む。
+- Chrome: `chrome://extensions` のデベロッパーモードで `dist/chrome`（`npm run build:dev`）を読み込む。Plamonic を起動しておけば、
+  アプリが Chrome に Native Messaging ホスト（アプリ内の `Contents/Helpers/plamonic-chrome-host`）を登録している。
 - Safari: `.appex` に `dist/safari` を入れる（いまは `Tools/extension-spike/build.sh` が入れる。本体への同梱はフェーズ 3）。
   隠しフォルダ（`.claude/` など）の中のアプリの拡張機能は Safari に出ないので、`~/Applications` に置いて起動する。
 

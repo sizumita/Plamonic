@@ -6,6 +6,7 @@ struct BrowserExtensionSection: View {
     @ObservedObject var store: SettingsStore
     @State private var safariEnabled: Bool?
     @State private var safariError: String?
+    @State private var chromeBrowsers: [String] = []
 
     static let safariExtensionID = "io.smdr.Plamonic.SafariExtension"
 
@@ -25,11 +26,20 @@ struct BrowserExtensionSection: View {
                     Button("Safari の設定を開く") { openSafariSettings() }
                 }
             }
+            LabeledContent("Chrome などの拡張機能") {
+                if chromeBrowsers.isEmpty {
+                    Text("Chromium 系のブラウザが見つかりません").foregroundStyle(.secondary)
+                } else {
+                    Label(chromeBrowsers.joined(separator: "、"), systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .lineLimit(2)
+                }
+            }
         } header: {
             Text("ブラウザ")
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Safari と Chrome の Plamonic 拡張機能が、Web ページをこの Mac で翻訳できるようにします。Safari では「設定」の「機能拡張」で Plamonic をオンにしてください。")
+                Text("Safari と Chrome の Plamonic 拡張機能が、Web ページをこの Mac で翻訳できるようにします。Safari では「設定」の「機能拡張」で Plamonic をオンにしてください。Chrome、Edge、Brave などには、Plamonic が起動したときに拡張機能との接続を登録します（拡張機能はそれぞれのストアから入れます）。")
                 if let safariError { Text(safariError).foregroundStyle(.orange) }
             }
         }
@@ -40,6 +50,7 @@ struct BrowserExtensionSection: View {
     }
 
     private func refresh() async {
+        chromeBrowsers = ChromeNativeHostInstaller.installedBrowsers()
         do {
             let state = try await SFSafariExtensionManager.stateOfSafariExtension(withIdentifier: Self.safariExtensionID)
             safariEnabled = state.isEnabled

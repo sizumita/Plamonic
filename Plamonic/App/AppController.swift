@@ -230,6 +230,8 @@ final class AppController: ObservableObject {
             do {
                 try server.start()
                 bridgeServer = server
+                // Chrome and the other Chromium browsers find the host inside this app by its manifest.
+                Task.detached(priority: .utility) { ChromeNativeHostInstaller.install() }
             } catch {
                 log.error("Bridge failed to start: \(String(describing: error), privacy: .public)")
             }

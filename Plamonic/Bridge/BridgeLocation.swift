@@ -12,6 +12,25 @@ enum BridgeLocation {
     static let socketName = "bridge.sock"
     /// `sockaddr_un.sun_path` holds 104 bytes including the terminator.
     static let maxPathBytes = 103
+    /// The group in Plamonic's entitlements (project.yml).
+    static let appGroup = "NBDP5VK335.io.smdr.Plamonic"
+
+    /// Where a process outside the group (Chrome's native host) looks for the socket, in order: the group
+    /// container a team-signed app uses, then Application Support for other builds.
+    static func candidatePaths(home: URL = realHome()) -> [String] {
+        [
+            home.appending(path: "Library/Group Containers/\(appGroup)/\(socketName)").path,
+            home.appending(path: "Library/Application Support/Plamonic/\(socketName)").path,
+        ]
+    }
+
+    /// The user's home folder, also from inside a sandbox (where NSHomeDirectory is the container).
+    static func realHome() -> URL {
+        if let entry = getpwuid(getuid()), let directory = entry.pointee.pw_dir {
+            return URL(fileURLWithPath: String(cString: directory))
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+    }
 
     static func socketURL() -> URL {
         if let group = usableAppGroup(),

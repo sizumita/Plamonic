@@ -4,8 +4,8 @@
 //   dist/safari/  copied into the Safari web extension (.appex) by the Xcode build
 //
 // Usage: node scripts/build.mjs [--dev] [--watch]
-//   --dev    adds sourcemaps and talks to the spike's native host (Tools/extension-spike), whose Chrome manifest
-//            allows the spike's extension ID; the dev build uses the spike's key so it gets that ID.
+//   --dev    adds sourcemaps and gives the Chrome build a fixed key, so it gets the extension ID that Plamonic's
+//            native host allows (ChromeNativeHostInstaller.extensionIDs).
 //   --watch  rebuilds on change.
 import * as esbuild from "esbuild";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -18,10 +18,11 @@ const dev = args.has("--dev");
 const watch = args.has("--watch");
 const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 
-/** The spike's key: gives the dev build the extension ID its native host manifest allows. */
-const SPIKE_KEY =
+/** Gives the dev build the extension ID bdoanndchiakcnoejbbjabpenbgbkfcb, which Plamonic's native host allows. */
+const DEV_KEY =
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0EogWWDRTAWsRWbtbWPDgPiGtcU0bS1F11g8EnI4p/IBR+hfz5xNwIjx46XYt9vaUcC3Y7fGtgaOVEJEd2wfeo+6iqFc8g2U9m+S0BDNN5KCBKGWPUWaWlsLl81GuwPpRf8EZp/T0X0Ron0bBJPr+1d495+Br8y3Usq8RMkdZJaO63ofNACM6XhoFHfVwF6cg3B5E6GlZKZWK0GSAuMW5th3iNKKp7HC7Xalzn/HmmtuEXyUaCOLICkdTvLp4pmm+bcZetWwY2NhgU5HAb7vhGPekhZwoL4ZI8VMgB1zrTvWTTPfYhJz5jK+YkQrDzZ/eZhrYUzGY7z5AwD6VbcYsQIDAQAB";
-const NATIVE_HOST = dev ? "io.smdr.plamonic.spike" : "io.smdr.plamonic";
+/** Plamonic's native host (Contents/Helpers/plamonic-chrome-host, registered by the app at launch). */
+const NATIVE_HOST = "io.smdr.plamonic";
 
 /** Sites the content script runs on. A feature for a new site adds its pattern here (and in features/index.ts). */
 const CONTENT_MATCHES = ["https://www.youtube.com/*"];
@@ -57,7 +58,7 @@ function manifest(browser) {
     });
     base.permissions.push("sidePanel");
     base.side_panel = { default_path: "sidebar.html" };
-    if (dev) base.key = SPIKE_KEY;
+    if (dev) base.key = DEV_KEY;
   }
   return base;
 }

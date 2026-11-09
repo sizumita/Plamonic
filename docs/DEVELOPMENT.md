@@ -47,8 +47,12 @@ says to run `npm run build`. [BrowserExtension/README.md](../BrowserExtension/RE
   extension talks to the app through the App Group container, so it needs a build signed by the team that owns the
   group (`NBDP5VK335`, [Signing local builds](#signing-local-builds)); an ad-hoc build shows the extension, but the
   extension cannot reach the app.
-- **Chrome**: load `BrowserExtension/dist/chrome` unpacked in `chrome://extensions`. Chrome reaches the app through
-  a native messaging host ([BrowserExtension/README.md](../BrowserExtension/README.md)).
+- **Chrome** (and other Chromium browsers): load `BrowserExtension/dist/chrome` unpacked in `chrome://extensions`,
+  built with `npm run build:dev`, whose fixed key gives it the extension ID the host allows. Chrome reaches the app
+  through the native messaging host inside it (`Contents/Helpers/plamonic-chrome-host`), which Plamonic registers with
+  the installed browsers when it starts (`~/Library/Application Support/<browser>/NativeMessagingHosts/io.smdr.plamonic.json`).
+  The manifest names the app it was written by, so after trying a build from another folder, start the app you
+  mean to use again.
 
 ### Signing local builds
 
