@@ -170,7 +170,11 @@ class PageTranslation implements FeatureInstance {
   }
 
   private items(): SyncItem[] {
-    return this.blocks.map((block) => ({ id: block.id, text: block.paragraph.markup.input }));
+    return this.blocks.map(({ id, paragraph: { markup } }) => ({
+      id,
+      text: markup.plain,
+      input: markup.input === markup.plain ? undefined : markup.input,
+    }));
   }
 
   /**

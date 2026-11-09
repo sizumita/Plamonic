@@ -270,15 +270,30 @@ function isWordBounded(text: string, range: { start: number; end: number }, need
 function listNumbers(text: string): number[] {
   const numbers = [...text.matchAll(LIST_NUMBER)].map((match) => number(match[1]!));
   for (const char of text) {
-    const code = char.codePointAt(0)!;
-    const enclosed =
-      (code >= 0x2460 && code <= 0x24ff) || (code >= 0x2776 && code <= 0x2793) || (code >= 0x3251 && code <= 0x325f) ||
-      (code >= 0x32b1 && code <= 0x32bf);
-    if (!enclosed) continue;
-    const value = Number.parseInt(char.normalize("NFKC").replace(/\D/g, ""), 10);
-    if (Number.isInteger(value) && value <= MAX_ID) numbers.push(value);
+    const value = enclosedNumber(char.codePointAt(0)!);
+    if (value !== undefined) numbers.push(value);
   }
   return numbers;
+}
+
+/** The value of a circled, parenthesized or dotted number ("①", "⑴", "⒈", "❶", "➊", "㉑"); NFKC leaves some as they are. */
+function enclosedNumber(code: number): number | undefined {
+  const ranges: [first: number, last: number, value: number][] = [
+    [0x2460, 0x2473, 1], // ①–⑳
+    [0x2474, 0x2487, 1], // ⑴–⒇
+    [0x2488, 0x249b, 1], // ⒈–⒛
+    [0x24ea, 0x24ea, 0], // ⓪
+    [0x24eb, 0x24f4, 11], // ⓫–⓴
+    [0x24f5, 0x24fe, 1], // ⓵–⓾
+    [0x24ff, 0x24ff, 0], // ⓿
+    [0x2776, 0x277f, 1], // ❶–❿
+    [0x2780, 0x2789, 1], // ➀–➉
+    [0x278a, 0x2793, 1], // ➊–➓
+    [0x3251, 0x325f, 21], // ㉑–㉟
+    [0x32b1, 0x32bf, 36], // ㊱–㊿
+  ];
+  for (const [first, last, value] of ranges) if (code >= first && code <= last) return value + code - first;
+  return undefined;
 }
 
 function number(digits: string): number {

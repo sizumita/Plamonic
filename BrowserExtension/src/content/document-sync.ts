@@ -8,7 +8,10 @@ import type { FeatureContext } from "./feature";
  */
 export interface SyncItem {
   id: string;
+  /** What the app's filters judge (skipped, already in the target language). */
   text: string;
+  /** What the model gets, when it differs from `text`: the text with its links and formatting marked. */
+  input?: string;
 }
 
 export interface SyncOptions {

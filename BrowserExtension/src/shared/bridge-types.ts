@@ -14,7 +14,8 @@ export type BridgeRequest =
       type: "sync";
       document: string;
       kind?: "captions" | "page";
-      items?: { id: string; text: string }[];
+      /** `input`: what the model gets when it differs from `text` (a page's paragraph with its links marked). */
+      items?: { id: string; text: string; input?: string }[];
       focus?: string;
       urgent?: number;
       /** The items on screen, top to bottom (a page): translated first. */

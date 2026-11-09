@@ -850,7 +850,7 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
 | type | 内容 | 応答 |
 | --- | --- | --- |
 | `hello` | 起動しているか、何ができるか（`url` を付けると、`targetLanguage` はそのページのサイトの翻訳先） | `protocol`、`version`、`enabled`、`targetLanguage`、`ready`（モデルがあるか）、`features`（`documents`、`translate`、`sites`） |
-| `sync` | 文書の文章（`items: [{id, text}]`、初回と変わったときだけ。2,000 文字を超える文章は訳さず skipped）、`focus`（表示中の項目の id）、`urgent`（focus から何件を急ぐか、既定 3、最大 20）、`visible`（画面に見えている項目の id、上から順。60 件まで。あればこちらを急ぐ）、`kind`、`context`、`sourceLanguage`、`want`（結果が欲しい id、省略で全部） | `results: [{id, state, text?}]`（state は pending / draft / final / failed / skipped）、`progress: {done, total}`（字幕は focus から先、ページは全部） |
+| `sync` | 文書の文章（`items: [{id, text, input?}]`、初回と変わったときだけ。2,000 文字を超える文章は訳さず skipped。`input` はモデルに渡す文章が `text` と違うとき）、`focus`（表示中の項目の id）、`urgent`（focus から何件を急ぐか、既定 3、最大 20）、`visible`（画面に見えている項目の id、上から順。60 件まで。あればこちらを急ぐ）、`kind`、`context`、`sourceLanguage`、`want`（結果が欲しい id、省略で全部） | `results: [{id, state, text?}]`（state は pending / draft / final / failed / skipped）、`progress: {done, total}`（字幕は focus から先、ページは全部） |
 | `close` | 文書を閉じる（タブを閉じた、別の動画に移った） | — |
 | `translate` | `texts`（20 件まで）をすぐ訳す（選択範囲など） | `translations`（失敗したところは null） |
 | `site` | `url` のページの Webサイトの設定（9.4） | `site: {pattern, name, mode, include, exclude, source}` |
@@ -862,8 +862,9 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
   拡張機能は `items` を付けて送り直す。
 - `kind: "captions"` は 1 本の話の続きなので、直前の行の訳を会話履歴として渡す。`"page"`（ほかの値も）は渡さず、
   先読みはページ全体（focus より前も）に及ぶ。
-- ページの段落のリンクと書式は、拡張機能が `[文字](番号)` の印（6.1 と同じ）と改行にして `text` に入れ、訳文から
-  組み直す（[BrowserExtension/README.md](../BrowserExtension/README.md)）。アプリはふつうの文章として訳す。
+- ページの段落のリンクと書式は、拡張機能が `[文字](番号)` の印（6.1 と同じ）と改行にして `input` に入れ、訳文から
+  組み直す（[BrowserExtension/README.md](../BrowserExtension/README.md)）。フィルタ（コードらしさ、言語の判定）は印のない
+  `text` で判断し、モデルには `input` を渡す（印の括弧でコードと見なされないように）。`input` が 4,000 文字を超えたら `text` を訳す。
   `context`（動画のタイトルとチャンネルなど）は PFML3 の context に、`sourceLanguage`（BCP 47）は PLaMo の言語コードに
   直せるときだけ翻訳元言語にする。
 - Safari の `sendNativeMessage` は 1 回の依頼に 1 回答えるだけなので、結果は拡張機能が取りに来る（ポーリング）。

@@ -121,3 +121,14 @@ test("line breaks travel as newlines, at most one blank line, never at the ends"
     { text: "\n\n3。" },
   ]);
 });
+
+test("enclosed list numbers that NFKC leaves as they are (❶, ➊) are reserved too", () => {
+  const markup = encode([plain("❶ "), styled("First"), plain(" ➋ second")]);
+  assert.equal(markup.input, "❶ [First](3) ➋ second");
+  // The model writes the list number as "(1)": it is the source's own, not a leftover marker.
+  assert.deepEqual(decode("(1) [最初](3) (2) 2番目", markup), [
+    { text: "(1) " },
+    { text: "最初", run: 1 },
+    { text: " (2) 2番目" },
+  ]);
+});
