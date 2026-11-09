@@ -29,6 +29,11 @@ on:
     paths:
       - Plamonic/**
       - Plamonic.xcodeproj/**
+      # The browser extensions ship inside the app (DESIGN §9).
+      - BrowserExtension/**
+      - "!BrowserExtension/README.md"
+      - PlamonicSafariExtension/**
+      - PlamonicChromeHost/**
       - Packages/PlamoKit/Package.swift
       - Packages/PlamoKit/Package.resolved
       - Packages/PlamoKit/Sources/**

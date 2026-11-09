@@ -14,7 +14,7 @@ import { CAPTIONS_VIEW, type CaptionsPhase, type CaptionsViewState } from "./vie
  * YouTube captions: finds the captions of the video being watched, has the app translate them ahead of
  * playback, draws the translation over the video and gives the sidebar a transcript that follows playback.
  *
- * How the captions are found (Tools/extension-spike/README.md): the caption server only answers requests that
+ * How the captions are found (docs/BROWSER_EXTENSION_NOTES.md): the caption server only answers requests that
  * carry the player's proof-of-origin token, so the page hook reports the player's own caption request, and the
  * same URL with another `lang`/`kind` fetches the track to translate. The player asks only while captions are
  * on, so captions are switched on (and YouTube's are hidden behind ours).

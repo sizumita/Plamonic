@@ -823,7 +823,7 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
   `allowed_origins` に載せた ID だけ（開発用ビルドの ID。Chrome Web Store に出したらその ID を足す）。
 - 権限 0600 で、つなげてきたプロセスの uid が同じときだけ受ける。1 つの接続で何行送ってもよく、最後の行は改行が
   なくても（送り側が書き込みを閉じれば）答える。1 行は 8 MB まで。60 秒何も来ない接続は切る。
-- 検証（フェーズ 0）の結果と、拡張機能側で気をつけることは `Tools/extension-spike/README.md`。
+- 実際のブラウザで確かめたことと、ブラウザやサイトごとに気をつけることは [BROWSER_EXTENSION_NOTES.md](BROWSER_EXTENSION_NOTES.md)。
 - 拡張機能の構成と機能の足し方は [BrowserExtension/README.md](../BrowserExtension/README.md)。
 
 ### 9.2 メッセージ（`BridgeProtocol`、プロトコル 1）
