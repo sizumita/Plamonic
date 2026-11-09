@@ -65,7 +65,8 @@ class YouTubeCaptions implements FeatureInstance {
     addEventListener("message", this.onMessage);
     if (!this.video) return;
     this.keepPlayerButton();
-    if (this.context.settings().captionOverlay !== "off") this.begin();
+    // A sidebar left open from the previous video (the page moved on without loading) shows this one's at once.
+    if (this.context.settings().captionOverlay !== "off" || this.context.hasSidebar()) this.begin();
   }
 
   private begin() {
