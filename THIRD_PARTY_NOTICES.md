@@ -51,6 +51,9 @@ repositories (these files are the same in every model size). Paths are relative 
 | `Tokenizer/PlamoTokenizer.swift` | `tokenization_plamo.py` |
 | `PlamoPromptBuilder.swift` | `chat_template.jinja` (builds the same prompts in Swift) |
 
+`Generation/PlamoBatchGenerator.swift` is not a port, but it follows the design of mlx-lm's `BatchGenerator` and
+`BatchKVCache` (left-padded rows with per-row positions and masks).
+
 What the original files and repositories state:
 
 - `modeling_plamo_mlx.py` starts with this notice:

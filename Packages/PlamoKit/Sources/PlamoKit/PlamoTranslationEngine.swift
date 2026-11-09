@@ -3,7 +3,11 @@ import MLX
 import os
 
 /// Runs PLaMo translations. All model loading and MLX evaluation happens on the actor's own
-/// serial queue, so calls are serialized and never block Swift's cooperative thread pool.
+/// serial queue, so it never blocks Swift's cooperative thread pool.
+///
+/// Concurrent translations with the same model are generated together (`PlamoBatchGenerator`): a decode
+/// step for several sequences costs little more than for one. One driver task steps the batches and
+/// yields between steps, so requests that arrive meanwhile join the running batch.
 ///
 /// Several models can be loaded at once (e.g. a 0.8B draft model and a 2B final model).
 /// Each loaded model keeps the KV cache of its last prompt and reuses the shared prefix.
@@ -21,8 +25,13 @@ public actor PlamoTranslationEngine {
             loadedKeys.withLock { $0 = keys }
         }
     }
-    /// Keys of `generators`, readable without waiting for the actor (which runs whole generations).
+    /// Keys of `generators`, readable without waiting for the actor (which runs model loads and decode steps).
     private nonisolated let loadedKeys = OSAllocatedUnfairLock<Set<String>>(initialState: [])
+    private var batches: [String: PlamoBatchGenerator] = [:]
+    /// Steps the batches while any has work.
+    private var driver: Task<Void, Never>?
+    private var driverTurn = 0
+    private var maxBatchSize = 8
     private var lastUsed: [String: Date] = [:]
     private var reusePromptPrefix = true
     private var idleUnloadInterval: TimeInterval?
@@ -86,6 +95,8 @@ public actor PlamoTranslationEngine {
     public func unload(directory: URL) {
         let k = key(directory)
         guard generators.removeValue(forKey: k) != nil else { return }
+        // Running translations stop as if cancelled.
+        batches.removeValue(forKey: k)?.failAll(CancellationError())
         lastUsed[k] = nil
         Memory.clearCache()
     }
@@ -93,6 +104,9 @@ public actor PlamoTranslationEngine {
     public func unloadAll() {
         guard !generators.isEmpty else { return }
         generators.removeAll()
+        let running = batches.values
+        batches.removeAll()
+        for batch in running { batch.failAll(CancellationError()) }
         lastUsed.removeAll()
         idleTask?.cancel()
         idleTask = nil
@@ -103,6 +117,12 @@ public actor PlamoTranslationEngine {
     public func setPromptCacheReuse(_ enabled: Bool) {
         reusePromptPrefix = enabled
         for gen in generators.values { gen.reusePromptPrefix = enabled }
+    }
+
+    /// Sequences of one model generated together (default 8); further translations wait for a free row.
+    public func setMaxBatchSize(_ size: Int) {
+        maxBatchSize = max(1, size)
+        for batch in batches.values { batch.maxBatchSize = maxBatchSize }
     }
 
     /// Forgets the cached prompts of all loaded models (the models stay loaded).
@@ -122,31 +142,33 @@ public actor PlamoTranslationEngine {
     /// Translates with an installed variant (loading it on first use).
     /// `onPartial` receives the whole partial translation so far, throttled; it is called on the
     /// engine's queue and must return quickly. Cancel the calling Task to stop generation.
+    /// Translations running at the same time with the same model are generated in one batch.
     public func translate(
         _ request: PlamoTranslationRequest,
         variant: PlamoModelVariant,
         onPartial: (@Sendable (String) -> Void)? = nil
-    ) throws -> PlamoTranslationResult {
+    ) async throws -> PlamoTranslationResult {
         guard isLoaded(variant) || store.isInstalled(variant) else { throw PlamoError.modelNotInstalled(variant) }
-        return try translate(request, modelDirectory: store.directory(for: variant), onPartial: onPartial)
+        return try await translate(request, modelDirectory: store.directory(for: variant), onPartial: onPartial)
     }
 
     public func translate(
         _ request: PlamoTranslationRequest,
         modelDirectory: URL,
         onPartial: (@Sendable (String) -> Void)? = nil
-    ) throws -> PlamoTranslationResult {
+    ) async throws -> PlamoTranslationResult {
         let start = Date()
         var timings = PlamoTimings()
         try Task.checkCancellation()
         let (gen, loadTime) = try generator(for: modelDirectory)
         timings.load = loadTime
+        let k = key(modelDirectory)
         defer {
-            lastUsed[key(modelDirectory)] = Date()
+            lastUsed[k] = Date()
             scheduleIdleCheck()
         }
 
-        var output = try run(gen, request, timings: &timings, onPartial: onPartial)
+        var output = try await run(gen, key: k, request, timings: &timings, onPartial: onPartial)
         var retried = false
         var wrong = PlamoOutputCheck.looksWrong(
             input: request.text, output: output.text, targetLanguage: request.targetLanguage)
@@ -158,7 +180,7 @@ public actor PlamoTranslationEngine {
                 fallback.context = nil
             }
             if fallback != request {
-                output = try run(gen, fallback, timings: &timings, onPartial: onPartial)
+                output = try await run(gen, key: k, fallback, timings: &timings, onPartial: onPartial)
                 retried = true
                 wrong = PlamoOutputCheck.looksWrong(
                     input: request.text, output: output.text, targetLanguage: request.targetLanguage)
@@ -185,27 +207,74 @@ public actor PlamoTranslationEngine {
     // MARK: - Internals
 
     private func run(
-        _ gen: PlamoGenerator, _ request: PlamoTranslationRequest, timings: inout PlamoTimings,
+        _ gen: PlamoGenerator, key k: String, _ request: PlamoTranslationRequest, timings: inout PlamoTimings,
         onPartial: (@Sendable (String) -> Void)?
-    ) throws -> PlamoGenerationOutput {
+    ) async throws -> PlamoGenerationOutput {
         let t0 = Date()
         let prompt = try PlamoPromptBuilder.prompt(for: request)
         let ids = gen.tokenizer.encode(prompt)
         timings.tokenize += Date().timeIntervalSince(t0)
-        let output: PlamoGenerationOutput
-        do {
-            // MLX reports C++ errors through a handler that would otherwise call fatalError.
-            output = try withError {
-                try gen.generate(
-                    prompt: ids, maxNewTokens: request.effectiveMaxNewTokens, onText: onPartial.map { f in { f($0) } })
+        let cancellation = PlamoCancellationFlag()
+        let maxNewTokens = request.effectiveMaxNewTokens
+        let output = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<PlamoGenerationOutput, Error>) in
+                submit(
+                    key: k, generator: gen, prompt: ids, maxNewTokens: maxNewTokens, onPartial: onPartial,
+                    cancellation: cancellation
+                ) { continuation.resume(with: $0) }
             }
-        } catch let error as MLXError {
-            gen.resetCache()
-            throw PlamoError.inferenceFailed(error.localizedDescription)
+        } onCancel: {
+            cancellation.cancel()
         }
         timings.prefill += output.prefillTime
         timings.decode += output.decodeTime
         return output
+    }
+
+    private func submit(
+        key k: String, generator gen: PlamoGenerator, prompt: [Int], maxNewTokens: Int,
+        onPartial: (@Sendable (String) -> Void)?, cancellation: PlamoCancellationFlag,
+        completion: @escaping (Result<PlamoGenerationOutput, Error>) -> Void
+    ) {
+        // The model may have been unloaded while the prompt was built.
+        guard generators[k] === gen else {
+            completion(.failure(CancellationError()))
+            return
+        }
+        let batch = batches[k] ?? {
+            let created = PlamoBatchGenerator(generator: gen)
+            created.maxBatchSize = maxBatchSize
+            batches[k] = created
+            return created
+        }()
+        batch.submit(
+            prompt: prompt, maxNewTokens: maxNewTokens, onText: onPartial.map { f in { f($0) } },
+            cancellation: cancellation, completion: completion)
+        if driver == nil {
+            driver = Task { await self.drive() }
+        }
+    }
+
+    /// Steps the batches with work in turn, one step each, until none has work. Between steps it yields
+    /// the actor, so new requests join, cancelled ones leave and other calls are not held for a whole
+    /// generation.
+    private func drive() async {
+        while true {
+            let busy = batches.filter { $0.value.hasWork }.sorted { $0.key < $1.key }
+            guard !busy.isEmpty else { break }
+            driverTurn &+= 1
+            let (k, batch) = busy[driverTurn % busy.count]
+            do {
+                // MLX reports C++ errors through a handler that would otherwise call fatalError.
+                try withError { try batch.step() }
+            } catch {
+                let failure = (error as? MLXError).map { PlamoError.inferenceFailed($0.localizedDescription) } ?? error
+                batch.failAll(failure)
+                generators[k]?.resetCache()
+            }
+            await Task.yield()
+        }
+        driver = nil
     }
 
     private nonisolated func key(_ directory: URL) -> String {
@@ -260,7 +329,13 @@ public actor PlamoTranslationEngine {
         guard let interval = idleUnloadInterval else { return }
         let now = Date()
         for (k, date) in lastUsed where now.timeIntervalSince(date) >= interval - 0.5 {
+            // A model that is generating is in use.
+            guard batches[k]?.hasWork != true else {
+                lastUsed[k] = now
+                continue
+            }
             generators[k] = nil
+            batches[k] = nil
             lastUsed[k] = nil
         }
         Memory.clearCache()

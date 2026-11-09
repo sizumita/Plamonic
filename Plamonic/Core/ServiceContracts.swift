@@ -30,7 +30,8 @@ enum TranslationBackendError: Error, Sendable {
     case failed(String)
 }
 
-/// Runs PLaMo inference. Calls are serialized by the implementation; cancellation of the calling Task stops generation.
+/// Runs PLaMo inference. Concurrent calls with the same model are generated together in one batch;
+/// cancellation of the calling Task stops generation.
 protocol TranslationBackend: AnyObject, Sendable {
     /// `onPartial` receives the whole text generated so far (cumulative, not a delta, no special tokens),
     /// on an arbitrary thread. Cancellation surfaces as `TranslationBackendError.cancelled` or `CancellationError`.
