@@ -142,16 +142,19 @@ final class PlamoBatchGenerator {
 
     // MARK: - Rows
 
+    /// Flags are set from other threads, so each is read once: a row that is removed is exactly a row that is
+    /// completed (completing one twice would trap its continuation; removing one uncompleted would leak it).
     private func dropCancelled() {
-        let cancelledWaiting = waiting.filter { $0.cancellation.isCancelled }
-        if !cancelledWaiting.isEmpty {
-            waiting.removeAll { $0.cancellation.isCancelled }
-            for row in cancelledWaiting { row.completion(.failure(CancellationError())) }
+        let waitingCancelled = waiting.map { $0.cancellation.isCancelled }
+        if waitingCancelled.contains(true) {
+            let cancelled = zip(waiting, waitingCancelled).filter { $0.1 }.map(\.0)
+            waiting = zip(waiting, waitingCancelled).filter { !$0.1 }.map(\.0)
+            for row in cancelled { row.completion(.failure(CancellationError())) }
         }
-        let keep = rows.indices.filter { !rows[$0].cancellation.isCancelled }
-        guard keep.count < rows.count else { return }
-        let cancelled = rows.indices.filter { rows[$0].cancellation.isCancelled }.map { rows[$0] }
-        removeRows(keeping: keep)
+        let rowsCancelled = rows.map { $0.cancellation.isCancelled }
+        guard rowsCancelled.contains(true) else { return }
+        let cancelled = zip(rows, rowsCancelled).filter { $0.1 }.map(\.0)
+        removeRows(keeping: rowsCancelled.indices.filter { !rowsCancelled[$0] })
         for row in cancelled { row.completion(.failure(CancellationError())) }
     }
 
