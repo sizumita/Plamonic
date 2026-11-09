@@ -154,12 +154,13 @@ enum AppPresets {
         p.rules = ExtractionRules(
             containers: [classes("scroll-view__viewport")],
             items: [],
-            excludes: [classes("tool-collapsible"), classes("sticky"), classes("sr-only")])
+            // Expanded thinking uses tool-collapsible too; its button is skipped by includeControls.
+            excludes: [classes("sticky"), classes("sr-only")])
         p.context = "A conversation between a software engineer and an AI coding agent in OpenCode."
         p.enableManualAccessibility = true
         return AppPreset(
             profile: p, kind: .aiAssistant, verification: .verified,
-            note: "デスクトップ版の本文領域（scroll-view__viewport）を段落ごとに訳します。ツール実行（tool-collapsible）と固定ヘッダ（sticky）は訳しません。CLI 版はターミナルのプリセットで訳します。",
+            note: "デスクトップ版の本文領域（scroll-view__viewport）を、展開した思考の本文も含めて段落ごとに訳します。開いたツールの説明文も対象です。操作ボタンと固定ヘッダ（sticky）は訳しません。CLI 版はターミナルのプリセットで訳します。",
             coveredTools: ["OpenCode"])
     }()
 

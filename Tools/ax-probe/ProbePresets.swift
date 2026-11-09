@@ -54,7 +54,8 @@ enum ProbePresets {
             p.scope = .rules
             p.granularity = .paragraph
             p.rules.containers = [m(dom: ["scroll-view__viewport"])]
-            p.rules.excludes = [m(dom: ["tool-collapsible", "sticky", "sr-only"])]
+            // Thinking shares tool-collapsible with tools; scan its expanded paragraphs.
+            p.rules.excludes = [m(dom: ["sticky", "sr-only"])]
         },
         Preset(name: "terminal", bundleIDs: ["com.apple.Terminal", "com.googlecode.iterm2"]) { p in
             // Only the screen text area (skips the title bar).

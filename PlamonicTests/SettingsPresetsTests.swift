@@ -74,13 +74,20 @@ final class SettingsPresetsTests: XCTestCase {
 
         let openCode = AppPresets.openCodeDesktop.profile.rules
         XCTAssertEqual(openCode.containers.flatMap(\.domClassPrefixes), ["scroll-view__viewport"])
-        XCTAssertEqual(Set(openCode.excludes.flatMap(\.domClassPrefixes)), ["tool-collapsible", "sticky", "sr-only"])
+        XCTAssertEqual(Set(openCode.excludes.flatMap(\.domClassPrefixes)), ["sticky", "sr-only"])
         XCTAssertFalse(slack.excludes.contains { $0.domClassPrefixes.contains("sr-only") }, "Slack's list is sr-only")
         XCTAssertTrue(discord.excludes.contains { $0.domClassPrefixes.contains("repliedTextContent_") })
 
         // DeepSeek Harness lists its threads in an AXOutline that is not a navigation landmark.
         let deepSeek = AppPresets.deepSeekHarness.profile.rules
         XCTAssertTrue(deepSeek.excludes.contains { $0.roles == ["AXOutline"] })
+    }
+
+    func testOpenCodeExpandedThinkingIsNotExcluded() {
+        // OpenCode 2.2.5: the expanded thinking body is inside a tool-collapsible group.
+        let thinking = ElementTraits(role: "AXGroup", domClasses: ["tool-collapsible"])
+        let excludes = CompiledMatcherSet(AppPresets.openCodeDesktop.profile.rules.excludes)
+        XCTAssertFalse(excludes.matches(thinking))
     }
 
     func testBrowserRules() {

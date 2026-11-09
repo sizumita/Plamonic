@@ -773,7 +773,7 @@ c は「<アプリ名> がパスワードを待っているため、このウイ
 | Slack | Electron | DOM クラス `p-rich_text_*` を項目に |
 | Discord | Electron | DOM クラス接頭辞 `messageContent_` / `embedDescription_` |
 | Claude（Claude Code タブ） | Electron | `group/message-row` を項目、`group/status`・`sr-only` を除外 |
-| OpenCode | Electron + CLI | `scroll-view__viewport` をコンテナ、`tool-collapsible` を除外 |
+| OpenCode | Electron + CLI | `scroll-view__viewport` 内の段落（展開した思考やツールの説明文を含む）を翻訳、`sticky` と `sr-only` を除外 |
 | DeepSeek Harness | Electron | AXWebArea の汎用段落規則（未検証） |
 | Codex | CLI はターミナルモード。デスクトップ版は AXWebArea の汎用規則（未検証） | ターミナルモード |
 | Safari / Google Chrome | ブラウザ（Edge・Brave は Chrome と同じ方式で未検証） | AXWebArea の汎用ページ規則（banner・nav・search・footer・コードブロックを除外）、既定は手動。Chromium は AXEnhancedUserInterface |
