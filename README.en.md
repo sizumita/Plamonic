@@ -200,7 +200,8 @@ Plamonic is free software, licensed under the [GNU Affero General Public License
 
 The parts of PlamoKit that are ported from the PLaMo 3 Translate model repositories, and the test data generated with
 the models, are also subject to the PLaMo Community License ([English](LICENSES/PLaMo-Community-License.txt),
-[Japanese](LICENSES/PLaMo-Community-License.ja.txt)).
+[Japanese](LICENSES/PLaMo-Community-License.ja.txt)). The terms of the PLaMo Community License also apply to any model
+trained using the test data.
 
 The PLaMo 3 Translate models are not part of Plamonic and are not included in it. Plamonic downloads them from Hugging
 Face, and they are licensed by Preferred Networks under the PLaMo Community License.
