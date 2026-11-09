@@ -865,6 +865,7 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
 - ページの段落のリンクと書式は、拡張機能が `[文字](番号)` の印（6.1 と同じ）と改行にして `input` に入れ、訳文から
   組み直す（[BrowserExtension/README.md](../BrowserExtension/README.md)）。フィルタ（コードらしさ、言語の判定）は印のない
   `text` で判断し、モデルには `input` を渡す（印の括弧でコードと見なされないように）。`input` が 4,000 文字を超えたら `text` を訳す。
+  拡張機能は 1 回の要求の文章を UTF-8 で 6 MiB までに収める（全段落の `text` を送り、`input` は収まるあいだだけページの順に付ける）。
   `context`（動画のタイトルとチャンネルなど）は PFML3 の context に、`sourceLanguage`（BCP 47）は PLaMo の言語コードに
   直せるときだけ翻訳元言語にする。
 - Safari の `sendNativeMessage` は 1 回の依頼に 1 回答えるだけなので、結果は拡張機能が取りに来る（ポーリング）。

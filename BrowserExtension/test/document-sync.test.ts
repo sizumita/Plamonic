@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DocumentSync } from "../src/content/document-sync";
+import { DocumentSync, fitInputs } from "../src/content/document-sync";
 import type { FeatureContext } from "../src/content/feature";
 import type { BridgeRequest, BridgeResponse } from "../src/shared/bridge-types";
 import { DEFAULT_SETTINGS } from "../src/shared/settings";
@@ -165,4 +165,19 @@ test("keeps asking for texts that failed, since the app tries them again", async
   const second = app.requests[1] as Extract<BridgeRequest, { type: "sync" }>;
   assert.ok(second.want?.includes("b"));
   sync.stop();
+});
+
+test("marked inputs go only while the request stays within its size, in order", () => {
+  const item = (id: string) => ({ id, text: "Yes or No?", input: "[Yes](1) or [No](2)?" });
+  // Texts take 3 × 11 bytes; the first two inputs (20 bytes each) fit in the 40 left, the third does not.
+  assert.deepEqual(fitInputs([item("a"), item("b"), item("c")], 33 + 40), [
+    item("a"),
+    item("b"),
+    { id: "c", text: "Yes or No?" },
+  ]);
+  // Multi-byte characters count as UTF-8: "は" is 3 bytes, an emoji 4.
+  assert.deepEqual(fitInputs([{ id: "j", text: "はい😀", input: "[はい](1)😀" }], 1 + 10 + 15), [
+    { id: "j", text: "はい😀", input: "[はい](1)😀" },
+  ]);
+  assert.deepEqual(fitInputs([{ id: "j", text: "はい😀", input: "[はい](1)😀" }], 1 + 10 + 14), [{ id: "j", text: "はい😀" }]);
 });
