@@ -124,6 +124,29 @@ final class BridgeTests: XCTestCase {
 
     // MARK: - Socket
 
+    /// What the Safari extension does: one request, one answer, through BridgeClient.
+    @MainActor
+    func testClientGetsTheServiceAnswerOverTheSocket() async throws {
+        let service = makeService()
+        let path = NSTemporaryDirectory() + "plb-\(UUID().uuidString.prefix(8)).sock"
+        let server = BridgeSocketServer(path: path) { line in await service.handle(line: line) }
+        try server.start()
+        defer { server.stop() }
+        let answer = try await Task.detached {
+            try BridgeClient.send(Data(#"{"id":5,"type":"hello"}"#.utf8), to: path, timeout: 5)
+        }.value
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: answer) as? [String: Any])
+        XCTAssertEqual(object["id"] as? Int, 5)
+        XCTAssertEqual(object["app"] as? String, "Plamonic")
+    }
+
+    func testClientReportsAnAppThatIsNotRunning() {
+        let path = NSTemporaryDirectory() + "plb-missing-\(UUID().uuidString.prefix(8)).sock"
+        XCTAssertThrowsError(try BridgeClient.send(Data("{}".utf8), to: path, timeout: 1)) { error in
+            XCTAssertEqual(error as? BridgeClient.Failure, .notRunning)
+        }
+    }
+
     func testSocketAnswersEveryLineOfAConnection() throws {
         let path = NSTemporaryDirectory() + "plb-\(UUID().uuidString.prefix(8)).sock"
         let server = BridgeSocketServer(path: path) { line in

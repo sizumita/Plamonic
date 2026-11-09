@@ -728,6 +728,9 @@ c は「<アプリ名> がパスワードを待っているため、このウイ
 - 画面収録の許可は任意（背景色を原文に合わせるときだけ使う）。取り込んだ画像は色を測るだけで、保存も送信もしない。
   初回の案内の 3 番目（「見た目をなじませる（任意）」）と「表示」設定から求める。許可が反映されるまで再起動が要ることがある
   （`CGPreflightScreenCaptureAccess` が再起動まで false のままのことがある）。許可を確かめるだけでシステムの確認は出さない。
+- Safari の拡張機能（`PlamonicSafariExtension.appex`、9 章）を同梱する。リリースでは `scripts/sign-app.sh` が
+  `PlamonicSafariExtension/PlamonicSafariExtension.entitlements`（サンドボックスと App Group）で先に署名する。
+  Safari 18.4 以降は、Developer ID で署名し公証を受けた拡張機能を App Store の外から配れる。
 - LSUIElement（Dock に出さない）。bundle ID は `io.smdr.Plamonic`。設定・キャッシュ・モデルは bundle ID ではなく
   `~/Library/Application Support/Plamonic` に置く。
 - 配布するアプリ（正式版とベータ版）は Developer ID で署名し、公証を受ける。署名がバージョンをまたいで同じなので、
@@ -804,6 +807,10 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
   届くのはここだけ。グループ ID がアプリの署名のチーム ID で始まるときだけ使い、そうでないビルド（アドホック署名、
   別のチーム）は `~/Library/Application Support/Plamonic/bridge.sock` に置く（グループのコンテナに触ると macOS が
   ほかのアプリのデータへのアクセスを確認するため）。そのビルドでは Chrome だけが使える。
+- Safari の拡張機能はアプリに同梱する `Contents/PlugIns/PlamonicSafariExtension.appex`（サンドボックス、同じ App Group）。
+  中身は `BrowserExtension/dist/safari`（ビルドフェーズ `scripts/build-web-extension.sh` が入れる）と、メッセージを
+  そのままソケットへ渡す `SafariWebExtensionHandler`（`BridgeClient` を使う）。チームの署名がないビルドでは
+  App Group を使えないので、拡張機能は `appNotRunning` を返す。
 - 権限 0600 で、つなげてきたプロセスの uid が同じときだけ受ける。1 つの接続で何行送ってもよく、最後の行は改行が
   なくても（送り側が書き込みを閉じれば）答える。1 行は 8 MB まで。60 秒何も来ない接続は切る。
 - 検証（フェーズ 0）の結果と、拡張機能側で気をつけることは `Tools/extension-spike/README.md`。

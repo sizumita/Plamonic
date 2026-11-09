@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Signs Plamonic.app from the inside out for distribution, with the hardened runtime and a secure timestamp, as
 # notarization requires: Sparkle's helpers (as Sparkle's documentation lists them), then every framework and library
-# in Contents/Frameworks, then the app with its entitlements.
+# in Contents/Frameworks, then every app extension in Contents/PlugIns with its own entitlements
+# (PlugIns/<name>.appex is signed with <name>/<name>.entitlements in the repository), then the app with its
+# entitlements.
 #
 #   scripts/sign-app.sh APP IDENTITY ENTITLEMENTS [KEYCHAIN]
 #
@@ -21,6 +23,7 @@ entitlements="$3"
 keychain="${4:-}"
 [[ -d "$app/Contents/MacOS" ]] || fail "$app is not an app"
 [[ -f "$entitlements" ]] || fail "no entitlements file $entitlements"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 options=(--force --sign "$identity")
 if [[ "$identity" == - ]]; then
@@ -49,6 +52,16 @@ sign "$sparkle/Updater.app"
 while IFS= read -r -d '' item; do
   sign "$item"
 done < <(find "$frameworks" -mindepth 1 -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print0)
+
+plugins="$app/Contents/PlugIns"
+if [[ -d "$plugins" ]]; then
+  while IFS= read -r -d '' extension; do
+    name="$(basename "$extension" .appex)"
+    extension_entitlements="$root/$name/$name.entitlements"
+    [[ -f "$extension_entitlements" ]] || fail "no entitlements file $extension_entitlements for $name.appex"
+    sign "$extension" --entitlements "$extension_entitlements"
+  done < <(find "$plugins" -mindepth 1 -maxdepth 1 -name '*.appex' -print0)
+fi
 
 sign "$app" --entitlements "$entitlements"
 codesign --verify --deep --strict --verbose=2 "$app"

@@ -11,12 +11,14 @@
 		033ACD0D6FBE1A7069D3096E /* UpdateChannelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDBF7086B143E3F0E143FB5 /* UpdateChannelTests.swift */; };
 		03D1E2B9929652C531151C25 /* WindowLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C665292AD6C8B06646CFF12E /* WindowLocator.swift */; };
 		04E26487B3F31F75C8241A01 /* UpdateControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1BEEE0E04DC41B6B710547 /* UpdateControllerTests.swift */; };
+		04F1140F3E5E1379EFE92EE4 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C58CD1DABB963936A3D52C /* SafariWebExtensionHandler.swift */; };
 		0A81E3706AE74556EFFCCE1D /* OverlayLinkCursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C767A0354771B6FABECE5BD /* OverlayLinkCursor.swift */; };
 		0B051C7CDD0AB6374EF93581 /* OverlayPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1EB95C35A0558F6B10CAE4 /* OverlayPalette.swift */; };
 		0B3F225BA130892218D7884F /* TerminalPasswordPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5B0DB17E5FDCBFE97346DB0 /* TerminalPasswordPromptTests.swift */; };
 		0B56960003DC8252D7F182F7 /* OverlayClickPanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B81126D1DC12138D7C3256 /* OverlayClickPanels.swift */; };
 		0D0FA5869792D213EC23E6C7 /* OverlayLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3726E7D15572A3566A78907 /* OverlayLinks.swift */; };
 		0D3620C471A00300CE2B34E8 /* BridgeProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9AF4290A8EE701F164ACB12 /* BridgeProtocol.swift */; };
+		0F7B21378850305E684A6B68 /* PlamonicSafariExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BDB313A652F5B9F65059D62F /* PlamonicSafariExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		10ED6E8CDF8ED3A4B46B1267 /* TranslationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A53F5C5114030BC735599936 /* TranslationCoordinatorTests.swift */; };
 		1122D94628103BF9264B2AAF /* HotkeyCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 013B185B1FAC4386BA1E363D /* HotkeyCenter.swift */; };
 		1277536DF7D0EB4CF7B467B2 /* SettingsPasswordPauseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1305A0FFD33CC26D5C4FCC0C /* SettingsPasswordPauseTests.swift */; };
@@ -28,6 +30,7 @@
 		1DF5B98E8E15A1772E0CC0B4 /* SegmentLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710FFEDCA6C2970BF9E80E38 /* SegmentLinks.swift */; };
 		1F5289121EA2A5118EE54BE7 /* ExtractionBrowserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F49C07A1D4779CC24687B9C /* ExtractionBrowserTests.swift */; };
 		21E6964889B70A5A5550BE5A /* RulesEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7181924C05F7E1712AEF8D18 /* RulesEditor.swift */; };
+		22B03859FEBAAB93200947C0 /* BridgeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18541B7DA1212E2F267C2D4E /* BridgeClient.swift */; };
 		22C28926F560B9FE66BAE6BA /* SettingsCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49023A18B40CB807AE88793B /* SettingsCatalogTests.swift */; };
 		2309D8B033A4BD97BD23FAF4 /* OverlayPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3EDBC2FAD9F97F54F1F3668 /* OverlayPanel.swift */; };
 		26188DAA6B7208F544AEE17E /* AppPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A5BA18661E59EA6ABA50EC3 /* AppPresets.swift */; };
@@ -55,6 +58,7 @@
 		503C77F326F06EB092F1D4AC /* SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F681AB239F4482E79BF0D8 /* SmokeTest.swift */; };
 		50D1C8A0E4C4F5B10040B961 /* ExtractionObstacleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDB983CFC6D91FA18B3EE91 /* ExtractionObstacleTests.swift */; };
 		50E5C6C5292503A84AF5EEBF /* LineGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192FF4F9B2ADE7DB865BACEA /* LineGeometry.swift */; };
+		5122D9B445C5987B8EB0F956 /* BridgeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18541B7DA1212E2F267C2D4E /* BridgeClient.swift */; };
 		531452956004582B65F7AB8B /* CoordinateSpace.swift in Sources */ = {isa = PBXBuildFile; fileRef = E49EAEC9C4A2083E8742470E /* CoordinateSpace.swift */; };
 		53B5BA9A30446B6A196DC8F4 /* AppProfileEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AECD433CA3ABE979FF511F9D /* AppProfileEditor.swift */; };
 		54ACCA564E929E47C845DB97 /* OverlayLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59819E1DF0284C0BF712F65 /* OverlayLayoutTests.swift */; };
@@ -108,10 +112,12 @@
 		A7CEDDDDDD76E30DB74A38BB /* AppsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA026C77C2CFFAEA470BF270 /* AppsSettingsPane.swift */; };
 		A89E042DF6F101FA1F79245B /* PasswordEntryGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B3A1ADA36001D8AD9A6933C /* PasswordEntryGuardTests.swift */; };
 		A8D1E897F25B219687629849 /* AppAccessibilityEnabler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02DE5E5D28E7A99D1BBF2210 /* AppAccessibilityEnabler.swift */; };
+		A9D38CB601A2E61FCC258774 /* BridgeLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA2B9F7A327EA2C7E7B8FE1 /* BridgeLocation.swift */; };
 		ACF4829BDBF8CA0A2F33BCBA /* LanguageCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886F9E9A9AF2636EC07EF486 /* LanguageCatalog.swift */; };
 		ADF7EA5ED3F59543BFA97339 /* BridgeLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA2B9F7A327EA2C7E7B8FE1 /* BridgeLocation.swift */; };
 		AFCBE399A000FD98A2E7D0CC /* OverlayLinkHoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B812DC76F13999559233961B /* OverlayLinkHoverTests.swift */; };
 		B15A73F23472379882079C24 /* AppController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBBA6EFB14A4CE2C00FB3F2 /* AppController.swift */; };
+		B4B92FA199B8A3A7347E26F5 /* BrowserExtensionSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 428C1CBE253F2624D25B45B4 /* BrowserExtensionSection.swift */; };
 		B4D5FB7542DA74404B76ADEF /* TranslationLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DAE4EF2BCF9F0068E57A4F2 /* TranslationLinks.swift */; };
 		B5515D4A3D98BCE83317736D /* OverlayCoordinateSpaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591AC44D5623117B889EC5F5 /* OverlayCoordinateSpaceTests.swift */; };
 		B5FD9DA5E49DF5E77DD7FE86 /* OverlayTruncatedHoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571EB91056493EC312F5C741 /* OverlayTruncatedHoverTests.swift */; };
@@ -156,6 +162,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		AA8B761BDA440B903BA604B6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4E425C92EFC0E701602A48B8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 25C7AC841E71FFE35B6C210D;
+			remoteInfo = PlamonicSafariExtension;
+		};
 		E8D1046C0856EC41E5357345 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4E425C92EFC0E701602A48B8 /* Project object */;
@@ -164,6 +177,20 @@
 			remoteInfo = Plamonic;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D282593C1F3E265323EDC76B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0F7B21378850305E684A6B68 /* PlamonicSafariExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		013B185B1FAC4386BA1E363D /* HotkeyCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyCenter.swift; sourceTree = "<group>"; };
@@ -182,6 +209,7 @@
 		13D2AA87D3F9B25A0622BEFB /* OverlayFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayFitTests.swift; sourceTree = "<group>"; };
 		17710042ABC83B5BAE27DCEA /* ExtractionMatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtractionMatcherTests.swift; sourceTree = "<group>"; };
 		180834D951D54B7D08EDBC7D /* TerminalPasswordPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPasswordPrompt.swift; sourceTree = "<group>"; };
+		18541B7DA1212E2F267C2D4E /* BridgeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeClient.swift; sourceTree = "<group>"; };
 		192FF4F9B2ADE7DB865BACEA /* LineGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LineGeometry.swift; sourceTree = "<group>"; };
 		1AEDCEC526A8545F735CBB49 /* PlamonicApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlamonicApp.swift; sourceTree = "<group>"; };
 		1F49C07A1D4779CC24687B9C /* ExtractionBrowserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtractionBrowserTests.swift; sourceTree = "<group>"; };
@@ -192,10 +220,12 @@
 		31D086F5C0881B24DF11BB7A /* OverlayLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayLayout.swift; sourceTree = "<group>"; };
 		33C9A5A8C450C5976CF230E6 /* TranslationBurstControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationBurstControlTests.swift; sourceTree = "<group>"; };
 		357456DB820C8140F0E28008 /* SessionLinkActivatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLinkActivatorTests.swift; sourceTree = "<group>"; };
+		39C58CD1DABB963936A3D52C /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
 		3C23B23E7F343E5DBB992A5A /* TextFitter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextFitter.swift; sourceTree = "<group>"; };
 		3D777C394E08B7A54130DF24 /* ElementInspectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementInspectorSheet.swift; sourceTree = "<group>"; };
 		3DC8837C886037F1FEB0C0A7 /* MenuBarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarIcon.swift; sourceTree = "<group>"; };
 		3E53B7371D6E5F1F499DE651 /* SettingsSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSnapshot.swift; sourceTree = "<group>"; };
+		428C1CBE253F2624D25B45B4 /* BrowserExtensionSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserExtensionSection.swift; sourceTree = "<group>"; };
 		469784334C4D7BED18370B94 /* PlamonicTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PlamonicTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		472863272B23D2AC5BB2E30D /* HotkeySpecFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySpecFormatting.swift; sourceTree = "<group>"; };
 		49023A18B40CB807AE88793B /* SettingsCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCatalogTests.swift; sourceTree = "<group>"; };
@@ -280,6 +310,7 @@
 		BB09530F195886C7EF21DDBB /* TranslationCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationCache.swift; sourceTree = "<group>"; };
 		BC1C4625F240BAF39EFFB799 /* TranslationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationCoordinator.swift; sourceTree = "<group>"; };
 		BC673ED4D8394157986E91C5 /* AdvancedSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsPane.swift; sourceTree = "<group>"; };
+		BDB313A652F5B9F65059D62F /* PlamonicSafariExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PlamonicSafariExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C18933660C33EDE054837DE1 /* TranslationFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationFilters.swift; sourceTree = "<group>"; };
 		C283467725F1568B777E0F62 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
 		C328B394C68B84AC24F41860 /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
@@ -381,6 +412,7 @@
 				DB8EC42F2791E64EB4946BAB /* Config */,
 				11854B5C99363CBDBA93CB80 /* Packages */,
 				0818CF1589870BCBCA2B23FE /* Plamonic */,
+				840DBC5C85DC9B0AAA1231A7 /* PlamonicSafariExtension */,
 				F11C6899A15EF1B8F977DA07 /* PlamonicTests */,
 				AC3CFE2F2600201B467A73AC /* Products */,
 			);
@@ -461,6 +493,7 @@
 		6A209B25A68351A4D8FD6EEA /* Bridge */ = {
 			isa = PBXGroup;
 			children = (
+				18541B7DA1212E2F267C2D4E /* BridgeClient.swift */,
 				FCA2B9F7A327EA2C7E7B8FE1 /* BridgeLocation.swift */,
 				F9AF4290A8EE701F164ACB12 /* BridgeProtocol.swift */,
 				B92C68F3CCDA5117DA17D0FE /* BridgeService.swift */,
@@ -475,6 +508,14 @@
 				72D08C7F58555B12CC46A202 /* ScreenColorSampler.swift */,
 			);
 			path = ScreenCapture;
+			sourceTree = "<group>";
+		};
+		840DBC5C85DC9B0AAA1231A7 /* PlamonicSafariExtension */ = {
+			isa = PBXGroup;
+			children = (
+				39C58CD1DABB963936A3D52C /* SafariWebExtensionHandler.swift */,
+			);
+			path = PlamonicSafariExtension;
 			sourceTree = "<group>";
 		};
 		864109EC9F1731CC8FB04AB8 /* Overlay */ = {
@@ -521,6 +562,7 @@
 				BC673ED4D8394157986E91C5 /* AdvancedSettingsPane.swift */,
 				AECD433CA3ABE979FF511F9D /* AppProfileEditor.swift */,
 				CA026C77C2CFFAEA470BF270 /* AppsSettingsPane.swift */,
+				428C1CBE253F2624D25B45B4 /* BrowserExtensionSection.swift */,
 				107E3B2B37E080532206E187 /* DisplaySettingsPane.swift */,
 				3D777C394E08B7A54130DF24 /* ElementInspectorSheet.swift */,
 				DC34B5DB554C6635BE476F51 /* GeneralSettingsPane.swift */,
@@ -541,6 +583,7 @@
 			isa = PBXGroup;
 			children = (
 				C8B0174BC712554F20F633B3 /* Plamonic.app */,
+				BDB313A652F5B9F65059D62F /* PlamonicSafariExtension.appex */,
 				469784334C4D7BED18370B94 /* PlamonicTests.xctest */,
 			);
 			name = Products;
@@ -640,6 +683,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		25C7AC841E71FFE35B6C210D /* PlamonicSafariExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4E60CAD2E4F5A03473CBE2E6 /* Build configuration list for PBXNativeTarget "PlamonicSafariExtension" */;
+			buildPhases = (
+				1B5D93BF543127F7792709CF /* Sources */,
+				8B1AD6D9A0B7AB0B9DAF0DA7 /* Copy the web extension */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PlamonicSafariExtension;
+			packageProductDependencies = (
+			);
+			productName = PlamonicSafariExtension;
+			productReference = BDB313A652F5B9F65059D62F /* PlamonicSafariExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		84530F255C7A9DF5725BE857 /* PlamonicTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A97B9D6D171148081538D3DE /* Build configuration list for PBXNativeTarget "PlamonicTests" */;
@@ -665,10 +726,12 @@
 				B03CDC8B604ECBA9A1CDD5BB /* Sources */,
 				6DA902DFD9FB99E6CE0FAE09 /* Resources */,
 				9FE504510DAF46900CE1B96F /* Frameworks */,
+				D282593C1F3E265323EDC76B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F931ACA6E087566EB8F324A2 /* PBXTargetDependency */,
 			);
 			name = Plamonic;
 			packageProductDependencies = (
@@ -688,6 +751,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					25C7AC841E71FFE35B6C210D = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
 					84530F255C7A9DF5725BE857 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Manual;
@@ -717,6 +784,7 @@
 			projectRoot = "";
 			targets = (
 				8CE1D82B8FE5489F978D180F /* Plamonic */,
+				25C7AC841E71FFE35B6C210D /* PlamonicSafariExtension */,
 				84530F255C7A9DF5725BE857 /* PlamonicTests */,
 			);
 		};
@@ -736,7 +804,40 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		8B1AD6D9A0B7AB0B9DAF0DA7 /* Copy the web extension */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy the web extension";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/manifest.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "scripts/build-web-extension.sh \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
+		1B5D93BF543127F7792709CF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5122D9B445C5987B8EB0F956 /* BridgeClient.swift in Sources */,
+				A9D38CB601A2E61FCC258774 /* BridgeLocation.swift in Sources */,
+				04F1140F3E5E1379EFE92EE4 /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8D49710E4F7E431CE8BC9D3C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -805,10 +906,12 @@
 				26188DAA6B7208F544AEE17E /* AppPresets.swift in Sources */,
 				53B5BA9A30446B6A196DC8F4 /* AppProfileEditor.swift in Sources */,
 				A7CEDDDDDD76E30DB74A38BB /* AppsSettingsPane.swift in Sources */,
+				22B03859FEBAAB93200947C0 /* BridgeClient.swift in Sources */,
 				ADF7EA5ED3F59543BFA97339 /* BridgeLocation.swift in Sources */,
 				0D3620C471A00300CE2B34E8 /* BridgeProtocol.swift in Sources */,
 				B859DAB61492A070B3BA7A18 /* BridgeService.swift in Sources */,
 				B9C4BE78EAF7CBED633546A7 /* BridgeSocketServer.swift in Sources */,
+				B4B92FA199B8A3A7347E26F5 /* BrowserExtensionSection.swift in Sources */,
 				8A637706869EA83AC8836FC1 /* BurstControl.swift in Sources */,
 				531452956004582B65F7AB8B /* CoordinateSpace.swift in Sources */,
 				5D245AFF98E3682696F83982 /* DisplaySettingsPane.swift in Sources */,
@@ -899,6 +1002,11 @@
 			target = 8CE1D82B8FE5489F978D180F /* Plamonic */;
 			targetProxy = E8D1046C0856EC41E5357345 /* PBXContainerItemProxy */;
 		};
+		F931ACA6E087566EB8F324A2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 25C7AC841E71FFE35B6C210D /* PlamonicSafariExtension */;
+			targetProxy = AA8B761BDA440B903BA604B6 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -916,6 +1024,25 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = io.smdr.Plamonic;
 				PRODUCT_NAME = Plamonic;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		14471FB7AD7686C2E04ABB53 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PlamonicSafariExtension/PlamonicSafariExtension.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PlamonicSafariExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.smdr.Plamonic.SafariExtension;
+				PRODUCT_NAME = PlamonicSafariExtension;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -1017,6 +1144,25 @@
 			};
 			name = Debug;
 		};
+		62FB72553615BBFBD1D4C182 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = PlamonicSafariExtension/PlamonicSafariExtension.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PlamonicSafariExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.smdr.Plamonic.SafariExtension;
+				PRODUCT_NAME = PlamonicSafariExtension;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
 		6575E6D82B85B600EF648A72 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1108,6 +1254,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		4E60CAD2E4F5A03473CBE2E6 /* Build configuration list for PBXNativeTarget "PlamonicSafariExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				14471FB7AD7686C2E04ABB53 /* Debug */,
+				62FB72553615BBFBD1D4C182 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		8544D3F824F10F59957296B7 /* Build configuration list for PBXProject "Plamonic" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

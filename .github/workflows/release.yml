@@ -133,6 +133,14 @@ jobs:
       - name: Select Xcode
         run: scripts/select-xcode.sh "${XCODE}" --metal
 
+      # With the packages of package-lock.json. The app's build copies dist/safari into its Safari extension.
+      - name: Build the browser extension
+        working-directory: BrowserExtension
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build
+
       # Not signed: the sign job signs it. Apple silicon only: ARCHS also keeps the packages from compiling for Intel.
       - name: Build the app
         run: |
@@ -161,6 +169,10 @@ jobs:
           expect SUPublicEDKey "${SPARKLE_PUBLIC_KEY}"
           if [[ ! -d "${app}/Contents/Frameworks/Sparkle.framework" ]]; then
             echo "::error::The app does not embed Sparkle.framework."
+            exit 1
+          fi
+          if [[ ! -f "${app}/Contents/PlugIns/PlamonicSafariExtension.appex/Contents/Resources/manifest.json" ]]; then
+            echo "::error::The app does not embed the Safari extension with its web extension."
             exit 1
           fi
           echo "Architectures: $(lipo -archs "${app}/Contents/MacOS/Plamonic")"

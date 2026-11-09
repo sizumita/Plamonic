@@ -16,8 +16,12 @@ identity="${1:-$(security find-identity -v -p codesigning | awk -F'"' '/Develope
 rm -rf build/DD
 mkdir -p build
 xcodegen generate --quiet
-extension_dir=Extension
-[[ -f ../../BrowserExtension/dist/safari/manifest.json ]] && extension_dir=../../BrowserExtension/dist/safari
+# SPIKE_EXTENSION_DIR=Extension keeps the spike's own files (Plamonic itself now carries the real extension).
+extension_dir="${SPIKE_EXTENSION_DIR:-}"
+if [[ -z "$extension_dir" ]]; then
+  extension_dir=Extension
+  [[ -f ../../BrowserExtension/dist/safari/manifest.json ]] && extension_dir=../../BrowserExtension/dist/safari
+fi
 echo "Safari extension: $extension_dir"
 xcodebuild -project PlamonicSpike.xcodeproj -scheme PlamonicSpike -configuration Release \
   -derivedDataPath build/DD SPIKE_SIGN_IDENTITY="$identity" SPIKE_EXTENSION_DIR="$extension_dir" build -quiet
