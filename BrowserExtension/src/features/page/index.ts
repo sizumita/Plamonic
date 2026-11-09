@@ -175,7 +175,8 @@ class PageTranslation implements FeatureInstance {
 
   /**
    * New paragraphs, and paragraphs whose text is no longer what we left there (our translation, or the original
-   * we sent): the site rewrote or reused them, so they are taken again as new text.
+   * we sent) or whose inner element we write into was replaced: the site rewrote or reused them, so they are taken
+   * again as new text.
    */
   private rescan() {
     let changed = false;
@@ -184,7 +185,7 @@ class PageTranslation implements FeatureInstance {
         changed = true;
         continue;
       }
-      if (normalizeText(block.element.textContent ?? "") !== this.expectedText(block)) {
+      if (this.isStale(block)) {
         this.byElement.delete(block.element);
         block.original = undefined;
         block.result = undefined;
@@ -202,6 +203,16 @@ class PageTranslation implements FeatureInstance {
 
   private expectedText(block: Block) {
     return block.shown ?? block.text;
+  }
+
+  /**
+   * The site changed the paragraph since we planned it: its text is not what we left there, or the element we
+   * write into is no longer in it (replaced by one with the same text).
+   */
+  private isStale(block: Block) {
+    const target = block.paragraph.target;
+    if (target !== block.element && !block.element.contains(target)) return true;
+    return normalizeText(block.element.textContent ?? "") !== this.expectedText(block);
   }
 
   /**
@@ -257,7 +268,7 @@ class PageTranslation implements FeatureInstance {
       if (!result?.text || (result.state !== "draft" && result.state !== "final")) continue;
       if (block.result === result.text || !block.element.isConnected) continue;
       // The site put other text here since: it is translated anew with the next scan, not given this one.
-      if (normalizeText(block.element.textContent ?? "") !== this.expectedText(block)) {
+      if (this.isStale(block)) {
         this.scheduleRescan();
         continue;
       }
@@ -284,7 +295,7 @@ class PageTranslation implements FeatureInstance {
   private restore(block: Block) {
     if (!block.original || !block.element.isConnected) return;
     // Only where our translation is still what the element shows: elsewhere the site has replaced it.
-    if (normalizeText(block.element.textContent ?? "") === this.expectedText(block)) {
+    if (!this.isStale(block)) {
       block.paragraph.target.replaceChildren(...block.original);
     }
     block.element.removeAttribute("data-plamonic-translated");

@@ -86,8 +86,13 @@ export function planParagraph(block: Element): Paragraph {
         continue;
       }
       const text = element.textContent ?? "";
-      if (!/\S/.test(text) || NOT_TEXT.has(tag) || (isSkipped(element) && !isUnitText(text))) {
+      if (!/\S/.test(text) && !NOT_TEXT.has(tag) && element.childElementCount === 0) {
+        // Only whitespace (`Hello<span> </span>world`): it separates words, so it stays in the text.
+        addText(text, chain);
+      } else if (!/\S/.test(text) || NOT_TEXT.has(tag) || (isSkipped(element) && !isUnitText(text))) {
         atoms.push({ element, chain, run: runs.length - 1, before: false });
+        // An icon with spaces around it inside: the words on both sides stay apart.
+        if (/\s/.test(text)) addText(" ", chain);
       } else if (isSkipped(element) || (isLink(element) && isVerbatim(collapse(text)))) {
         runs.push({ chain, unit: element });
         texts.push({ text, styled: chain.length > 0, verbatim: true });
