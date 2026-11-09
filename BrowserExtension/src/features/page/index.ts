@@ -4,6 +4,7 @@ import type { Feature, FeatureContext, FeatureInstance } from "../../content/fea
 import { showToast } from "../../content/toast";
 import { validSelectors } from "../../shared/sites";
 import { BlockFinder, normalizeText } from "./blocks";
+import { OriginalPopup } from "./original-popup";
 
 /**
  * Translates the page's text in place: the paragraphs on screen first, then the rest of the page, and new ones
@@ -38,13 +39,23 @@ class PageTranslation implements FeatureInstance {
   private byElement = new WeakMap<Element, Block>();
   private counter = 0;
   private sync: DocumentSync | undefined;
-  /** Paragraphs on screen, with their top on the page (for ordering them top to bottom). */
+  /** Paragraphs on screen (or about to be), with their top on the page, for ordering them top to bottom. */
   private visible = new Map<Element, number>();
   private started = false;
-  private intersection: IntersectionObserver | undefined;
+  private measureTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly onViewportChange = () => this.scheduleMeasure();
   private mutations: MutationObserver | undefined;
   private rescanTimer: ReturnType<typeof setTimeout> | undefined;
   private warned = false;
+  /** The original of the translated paragraph under the pointer. */
+  private popup = new OriginalPopup(
+    "[data-plamonic-translated]",
+    () => this.translatedElements(),
+    (element) => {
+      const block = this.byElement.get(element);
+      return block?.shown !== undefined ? block.text : undefined;
+    },
+  );
 
   constructor(private readonly context: FeatureContext) {
     // Where to translate, from the site's settings in the app.
@@ -57,19 +68,6 @@ class PageTranslation implements FeatureInstance {
   }
 
   start() {
-    this.intersection = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) this.visible.set(entry.target, entry.boundingClientRect.top + scrollY);
-          else this.visible.delete(entry.target);
-        }
-        this.updateFocus();
-        // The first request waits for the first measurement, so it already knows what is on screen.
-        this.startSync();
-      },
-      // A little beyond the screen, so the next paragraphs are ready when they scroll in.
-      { rootMargin: "25% 0px" },
-    );
     this.addBlocks(this.finder.find(document.body));
     this.sync = new DocumentSync(this.context, {
       document: `page:${(location.origin + location.pathname + location.search).slice(0, 480)}`,
@@ -80,12 +78,16 @@ class PageTranslation implements FeatureInstance {
       url: location.href,
       onChange: () => this.apply(),
     });
-    // In case nothing is on screen to measure (an empty page): start anyway.
-    setTimeout(() => this.startSync(), 500);
+    // What is on screen, measured before the first request so it already goes first.
+    this.measure();
+    this.startSync();
+    addEventListener("scroll", this.onViewportChange, { capture: true, passive: true });
+    addEventListener("resize", this.onViewportChange, { passive: true });
     // Our own changes are taken out right after we make them (write), so every change seen here is the site's:
     // new paragraphs, or a site reusing an element for other text (YouTube does, for comments).
     this.mutations = new MutationObserver(() => this.scheduleRescan());
     this.mutations.observe(document.body, { childList: true, subtree: true, characterData: true });
+    this.popup.attach();
   }
 
   private scheduleRescan() {
@@ -108,9 +110,12 @@ class PageTranslation implements FeatureInstance {
   }
 
   stop() {
+    this.popup.detach();
     clearTimeout(this.rescanTimer);
+    clearTimeout(this.measureTimer);
+    removeEventListener("scroll", this.onViewportChange, true);
+    removeEventListener("resize", this.onViewportChange);
     this.mutations?.disconnect();
-    this.intersection?.disconnect();
     this.sync?.stop();
     for (const block of this.blocks) this.restore(block);
     this.mutations?.takeRecords();
@@ -149,7 +154,6 @@ class PageTranslation implements FeatureInstance {
       const block: Block = { id: `b${this.counter++}`, element, text: normalizeText(element.textContent ?? "") };
       this.blocks.push(block);
       this.byElement.set(element, block);
-      this.intersection?.observe(element);
       added++;
     }
     return added;
@@ -182,11 +186,35 @@ class PageTranslation implements FeatureInstance {
     if (this.addBlocks(this.finder.find(document.body)) > 0) changed = true;
     this.mutations?.takeRecords();
     if (changed) this.sync?.setItems(this.items());
-    this.updateFocus();
+    this.measure();
   }
 
   private expectedText(block: Block) {
     return block.shown !== undefined ? normalizeText(block.shown) : block.text;
+  }
+
+  /**
+   * Which paragraphs are on screen, or within a quarter of a screen of it (so the next ones are ready when they
+   * scroll in), by their boxes. Measured, not observed: an IntersectionObserver missed most of Reddit's comments.
+   */
+  private measure() {
+    const margin = innerHeight * 0.25;
+    this.visible.clear();
+    for (const block of this.blocks) {
+      const rect = block.element.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+      if (rect.bottom >= -margin && rect.top <= innerHeight + margin) this.visible.set(block.element, rect.top + scrollY);
+    }
+    this.updateFocus();
+  }
+
+  /** After scrolling settles a little (at most a few times a second while it goes on). */
+  private scheduleMeasure() {
+    if (this.measureTimer !== undefined) return;
+    this.measureTimer = setTimeout(() => {
+      this.measureTimer = undefined;
+      this.measure();
+    }, 200);
   }
 
   /** What is on screen, top to bottom (a sticky header first, then the article where it is scrolled to). */
@@ -232,7 +260,11 @@ class PageTranslation implements FeatureInstance {
         block.element.setAttribute("data-plamonic-translated", state);
       });
     }
-    if (updates.length) this.write(written, () => updates.forEach((update) => update()));
+    if (updates.length) {
+      this.write(written, () => updates.forEach((update) => update()));
+      // Translations change the paragraphs' heights.
+      this.scheduleMeasure();
+    }
   }
 
   private restore(block: Block) {
@@ -244,6 +276,10 @@ class PageTranslation implements FeatureInstance {
     block.element.removeAttribute("data-plamonic-translated");
     block.original = undefined;
     block.shown = undefined;
+  }
+
+  private *translatedElements(): Iterable<Element> {
+    for (const block of this.blocks) if (block.shown !== undefined) yield block.element;
   }
 
   private translatedCount() {
