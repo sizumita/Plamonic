@@ -145,6 +145,50 @@ final class SettingsStore: ObservableObject {
         commit(doc)
     }
 
+    // MARK: Websites
+
+    /// Stores a site profile, replacing the one with the same pattern (`replacing`, when the pattern itself was
+    /// edited). One identical to its preset is removed instead, so later preset updates apply.
+    func upsertSite(_ site: SiteProfile, replacing previousPattern: String? = nil) {
+        var site = site
+        site.pattern = site.pattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        site.includeSelectors = site.includeSelectors.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        site.excludeSelectors = site.excludeSelectors.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        if let target = site.targetLanguageOverride, !LanguageCatalog.isValidTarget(target) {
+            site.targetLanguageOverride = nil
+        }
+        var doc = document
+        if let previousPattern, previousPattern.caseInsensitiveCompare(site.pattern) != .orderedSame {
+            doc.sites.removeAll { $0.pattern.caseInsensitiveCompare(previousPattern) == .orderedSame }
+        }
+        let index = doc.sites.lastIndex { $0.pattern.caseInsensitiveCompare(site.pattern) == .orderedSame }
+        if let preset = SitePresets.preset(for: site.pattern), preset == site {
+            if let index { doc.sites.remove(at: index) }
+        } else if let index {
+            doc.sites[index] = site
+        } else {
+            doc.sites.append(site)
+        }
+        commit(doc)
+    }
+
+    /// Sets the mode of the site a page belongs to (the extension's menu: 「このサイトを自動で翻訳」). The page's
+    /// profile is edited, or, for a site without settings, one is made for its host.
+    @discardableResult
+    func setSiteMode(_ mode: TranslationMode, for url: URL) -> SiteProfile {
+        var (site, _) = snapshot.siteProfile(for: url)
+        site.mode = mode
+        upsertSite(site)
+        return snapshot.siteProfile(for: url).profile
+    }
+
+    /// Forgets the stored profile: a preset site goes back to its preset, another site to no settings.
+    func removeSite(_ pattern: String) {
+        var doc = document
+        doc.sites.removeAll { $0.pattern.caseInsensitiveCompare(pattern) == .orderedSame }
+        commit(doc)
+    }
+
     /// Discards the user's edits of a preset app. Returns false when the app has no preset
     /// (the stored profile is still removed, so the default profile applies).
     @discardableResult

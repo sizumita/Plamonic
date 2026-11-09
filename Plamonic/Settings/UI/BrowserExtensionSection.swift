@@ -29,7 +29,7 @@ struct BrowserExtensionSection: View {
             Text("ブラウザ")
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Safari と Chrome の Plamonic 拡張機能が、YouTube の字幕などをこの Mac で翻訳できるようにします。Safari では「設定」の「機能拡張」で Plamonic をオンにし、YouTube での実行を許可してください。")
+                Text("Safari と Chrome の Plamonic 拡張機能が、Web ページをこの Mac で翻訳できるようにします。Safari では「設定」の「機能拡張」で Plamonic をオンにしてください。")
                 if let safariError { Text(safariError).foregroundStyle(.orange) }
             }
         }

@@ -68,8 +68,9 @@ final class AppController: ObservableObject {
         self.updates = UpdateController(settings: settings)
         self.bridge = BridgeService(
             coordinator: coordinator,
-            globalSettings: { settings.global },
+            settings: { settings.snapshot },
             isReady: { TranslationModelPlan.make(settings: $0) { backend.isModelInstalled($0) }.hasModel },
+            setSiteMode: { mode, url in settings.setSiteMode(mode, for: url) },
             appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
         overlay.colorSampler = colorSampler
 

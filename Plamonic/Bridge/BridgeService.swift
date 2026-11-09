@@ -4,18 +4,22 @@ import Foundation
 @MainActor
 final class BridgeService {
     private let coordinator: TranslationCoordinator
-    private let globalSettings: @MainActor () -> GlobalSettings
+    private let settings: @MainActor () -> SettingsSnapshot
     private let isReady: @MainActor (EffectiveSettings) -> Bool
+    /// Writes a site's mode to the settings (the extension's menu).
+    private let setSiteMode: @MainActor (TranslationMode, URL) -> Void
     private let appVersion: String
 
     init(
         coordinator: TranslationCoordinator,
-        globalSettings: @escaping @MainActor () -> GlobalSettings,
+        settings: @escaping @MainActor () -> SettingsSnapshot,
         isReady: @escaping @MainActor (EffectiveSettings) -> Bool,
+        setSiteMode: @escaping @MainActor (TranslationMode, URL) -> Void = { _, _ in },
         appVersion: String
     ) {
+        self.setSiteMode = setSiteMode
         self.coordinator = coordinator
-        self.globalSettings = globalSettings
+        self.settings = settings
         self.isReady = isReady
         self.appVersion = appVersion
     }
@@ -31,7 +35,8 @@ final class BridgeService {
     }
 
     func handle(_ request: BridgeRequest) async -> BridgeResponse {
-        let global = globalSettings()
+        let snapshot = settings()
+        let global = snapshot.global
         // Not tied to 翻訳を有効にする: that switch (⌃⌥T) turns the overlays off; the extensions have their own.
         let enabled = global.acceptBrowserExtensions
         switch request.type {
@@ -57,7 +62,44 @@ final class BridgeService {
         case .translate:
             guard enabled else { return .failure(request.id, "disabled", "Plamonic の翻訳がオフになっています") }
             return await translate(request, global: global)
+        case .site:
+            guard let url = request.url.flatMap(URL.init(string:)) else {
+                return .failure(request.id, "badRequest", "url がありません")
+            }
+            let (profile, source) = snapshot.siteProfile(for: url)
+            var response = BridgeResponse(id: request.id, ok: true)
+            response.site = Self.site(profile, source: source)
+            return response
+        case .setSite:
+            guard let url = request.url.flatMap(URL.init(string:)), url.host() != nil,
+                let mode = request.mode.flatMap(TranslationMode.init(rawValue:))
+            else {
+                return .failure(request.id, "badRequest", "url と mode（off / automatic / manual）が要ります")
+            }
+            setSiteMode(mode, url)
+            let (profile, source) = settings().siteProfile(for: url)
+            var response = BridgeResponse(id: request.id, ok: true)
+            response.site = Self.site(profile, source: source)
+            return response
+        case .sites:
+            var response = BridgeResponse(id: request.id, ok: true)
+            response.sites = snapshot.siteProfiles.filter { $0.mode == .automatic }.map {
+                Self.site($0, source: snapshot.siteSource($0.pattern))
+            }
+            return response
         }
+    }
+
+    private static func site(_ profile: SiteProfile, source: ProfileSource) -> BridgeResponse.Site {
+        BridgeResponse.Site(
+            pattern: profile.pattern, name: profile.displayName, mode: profile.mode.rawValue,
+            include: profile.includeSelectors, exclude: profile.excludeSelectors, source: source.rawValue)
+    }
+
+    /// The site profile for the request's page, when it names one.
+    private func site(of request: BridgeRequest) -> SiteProfile? {
+        guard let url = request.url.flatMap(URL.init(string:)) else { return nil }
+        return settings().siteProfile(for: url).profile
     }
 
     private func translate(_ request: BridgeRequest, global: GlobalSettings) async -> BridgeResponse {
@@ -68,7 +110,8 @@ final class BridgeService {
             return .failure(request.id, "tooLarge", "texts が多すぎます（\(texts.count) 件）")
         }
         let settings = Self.documentSettings(
-            global: global, kind: "page", context: request.context ?? "", sourceLanguage: request.sourceLanguage)
+            global: global, kind: "page", context: request.context ?? "", sourceLanguage: request.sourceLanguage,
+            site: site(of: request))
         var translations: [String?] = []
         for text in texts {
             translations.append(await coordinator.translateOnce(text: text, settings: settings))
@@ -84,14 +127,19 @@ final class BridgeService {
             return .failure(request.id, "tooLarge", "項目が多すぎます（\(items.count) 件）")
         }
         let settings = Self.documentSettings(
-            global: global, kind: request.kind, context: request.context ?? "", sourceLanguage: request.sourceLanguage)
+            global: global, kind: request.kind, context: request.context ?? "", sourceLanguage: request.sourceLanguage,
+            site: site(of: request))
         let items = request.items.map { items in
             items.map {
                 TranslationCoordinator.ExternalItem(id: $0.id, text: String($0.text.prefix(BridgeProtocol.maxItemCharacters)))
             }
         }
         let urgent = min(max(request.urgent ?? BridgeProtocol.defaultUrgentCount, 0), BridgeProtocol.maxUrgentCount)
-        guard coordinator.updateDocument(key, items: items, focus: request.focus, urgentCount: urgent, settings: settings)
+        let visible = request.visible.map { Array($0.prefix(BridgeProtocol.maxVisible)) }
+        guard
+            coordinator.updateDocument(
+                key, items: items, focus: request.focus, urgentCount: urgent, visible: visible,
+                readsAll: request.kind != "captions", settings: settings)
         else {
             return .failure(request.id, "unknownDocument", "文書が見つかりません。items を付けて送り直してください")
         }
@@ -112,15 +160,19 @@ final class BridgeService {
         return .init(client: request.client ?? "", id: document)
     }
 
-    /// Settings for a document: the global ones, the page's context and the source language the page states.
-    /// Captions are one continuous talk, so their earlier lines go along as history.
+    /// Settings for a document: the global ones, the site's overrides (target language, form, its context before
+    /// the page's), and the source language the page states. Captions are one continuous talk, so their earlier
+    /// lines go along as history.
     nonisolated static func documentSettings(
-        global: GlobalSettings, kind: String?, context: String, sourceLanguage: String?
+        global: GlobalSettings, kind: String?, context: String, sourceLanguage: String?, site: SiteProfile? = nil
     ) -> EffectiveSettings {
         var profile = AppProfile(bundleID: "", displayName: "ブラウザ拡張機能")
         profile.mode = .automatic
         profile.useConversationHistory = kind == "captions"
-        profile.context = String(context.prefix(BridgeProtocol.maxContextCharacters))
+        profile.targetLanguageOverride = site?.targetLanguageOverride
+        profile.formOverride = site?.formOverride
+        let contexts = [site?.context ?? "", context].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        profile.context = String(contexts.filter { !$0.isEmpty }.joined(separator: " / ").prefix(BridgeProtocol.maxContextCharacters))
         var global = global
         if let sourceLanguage, let code = LanguageCatalog.plamoCode(forLanguageIdentifier: sourceLanguage) {
             global.sourceLanguage = code

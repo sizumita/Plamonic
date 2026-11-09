@@ -823,15 +823,19 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
 
 | type | 内容 | 応答 |
 | --- | --- | --- |
-| `hello` | 起動しているか、何ができるか | `protocol`、`version`、`enabled`、`targetLanguage`、`ready`（モデルがあるか）、`features`（`documents`、`translate`） |
-| `sync` | 文書の文章（`items: [{id, text}]`、初回と変わったときだけ）、`focus`（表示中の項目の id）、`urgent`（focus から何件を急ぐか、既定 3、最大 20）、`kind`、`context`、`sourceLanguage`、`want`（結果が欲しい id、省略で全部） | `results: [{id, state, text?}]`（state は pending / draft / final / failed / skipped）、`progress: {done, total}`（focus から先） |
+| `hello` | 起動しているか、何ができるか | `protocol`、`version`、`enabled`、`targetLanguage`、`ready`（モデルがあるか）、`features`（`documents`、`translate`、`sites`） |
+| `sync` | 文書の文章（`items: [{id, text}]`、初回と変わったときだけ）、`focus`（表示中の項目の id）、`urgent`（focus から何件を急ぐか、既定 3、最大 20）、`visible`（画面に見えている項目の id、上から順。60 件まで。あればこちらを急ぐ）、`kind`、`context`、`sourceLanguage`、`want`（結果が欲しい id、省略で全部） | `results: [{id, state, text?}]`（state は pending / draft / final / failed / skipped）、`progress: {done, total}`（字幕は focus から先、ページは全部） |
 | `close` | 文書を閉じる（タブを閉じた、別の動画に移った） | — |
 | `translate` | `texts`（20 件まで）をすぐ訳す（選択範囲など） | `translations`（失敗したところは null） |
+| `site` | `url` のページの Webサイトの設定（9.4） | `site: {pattern, name, mode, include, exclude, source}` |
+| `sites` | 動作が自動のサイト | `sites: [...]`（`site` と同じ形） |
+| `setSite` | `url` のサイトの動作を `mode`（off / automatic / manual）にして設定に保存する（拡張機能のメニュー） | `site` |
 
 - 文書は `client`（`safari` / `chrome`）と `document`（例 `yt:<動画 ID>`）で区別する。アプリが再起動したり、
   5 分間問い合わせがなくて忘れたりした文書に `items` なしで `sync` すると `unknownDocument` を返すので、
   拡張機能は `items` を付けて送り直す。
-- `kind: "captions"` は 1 本の話の続きなので、直前の行の訳を会話履歴として渡す。`"page"`（ほかの値も）は渡さない。
+- `kind: "captions"` は 1 本の話の続きなので、直前の行の訳を会話履歴として渡す。`"page"`（ほかの値も）は渡さず、
+  先読みはページ全体（focus より前も）に及ぶ。
   `context`（動画のタイトルとチャンネルなど）は PFML3 の context に、`sourceLanguage`（BCP 47）は PLaMo の言語コードに
   直せるときだけ翻訳元言語にする。
 - Safari の `sendNativeMessage` は 1 回の依頼に 1 回答えるだけなので、結果は拡張機能が取りに来る（ポーリング）。
@@ -842,12 +846,39 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
 次の 1 件を選ぶ。
 
 1. 手動の依頼（`translateOnce`、`translate`）
-2. 文書の focus から `urgent` 件のうち、まだ訳のないもの。下書きモデルがあれば下書きで
+2. 文書の画面に見えている項目（`visible` の順。なければ focus から `urgent` 件）のうち、まだ訳のないもの。下書きモデルがあれば下書きで
 3. ウインドウの初回の翻訳
 4. ウインドウの仕上げ
-5. 文書の先読み: focus から後ろを順に、仕上げのモデルで直接（急ぐ範囲の仕上げも含む。時間があるので下書きを挟まない）
+5. 文書の先読み: 急ぐ項目の仕上げ、focus から後ろを順に、ページならそのあと focus より前を、仕上げのモデルで直接
+   （時間があるので下書きを挟まない）
 
-focus より前の文章は訳さない（もう表示し終えた）。設定はグローバル設定に、文書の `context` と `sourceLanguage` を
+字幕では focus より前の行は訳さない（もう表示し終えた）。ページでは、見えている段落が固定のヘッダーと本文の途中のように
+離れていても `visible` で正しく急げる。設定はグローバル設定に、文書の `context` と `sourceLanguage` を
 重ねたもの。キャッシュ、失敗時の待機、長い文の分割、仕上げの途中で新しい急ぎの文章に譲るのはウインドウと同じ。
 文書を閉じる・忘れると、その文章だけが待っていた翻訳は止める。
+
+### 9.4 Webサイトの設定（`SiteProfile`、設定「Webサイト」）
+
+拡張機能がサイトごとにどう訳すかは、アプリの設定で一元管理する（ブラウザごとには持たない）。アプリの設定
+（`AppProfile`）と同じく、プリセット → 利用者が編集したもの（settings.json の `sites`）の順に重ね、プリセットと同じに
+戻した設定は保存しない。
+
+| 項目 | 内容 |
+| --- | --- |
+| サイト（`pattern`） | ホスト名（`www.youtube.com`）、`*.` を付けたドメイン（`*.wikipedia.org`、そのドメインとサブドメイン）、後ろにパスの先頭（`github.com/apple`）。URL に合うもののうち、ホスト名がそのまま一致し、パスが長いものほど優先 |
+| 動作 | 自動（ページを開いたら訳す）／手動（拡張機能のメニューの「このページを翻訳」）／オフ（訳さない）。設定のないサイトは手動でページ全体 |
+| 翻訳する場所・しない場所 | CSS セレクタ（1 行に 1 つ）。する場所が空ならページ全体。する場所に合う要素は、行の中に表示される要素でも 1 段落として扱う。読めないセレクタは使わない |
+| 翻訳先言語・文体・文脈 | 全体の設定を上書き。文脈はページのタイトルの前に付ける |
+
+- プリセット: YouTube（タイトル、説明、コメント）、X、Reddit、GitHub、Wikipedia、Hacker News。
+- 拡張機能はページを開くと `site`（URL）で設定を聞き、`sync` / `translate` には `url` を付けてサイトの上書きを適用させる。
+- ツールバーのメニュー: 「このページを翻訳」（その場で 1 回）、「このサイトを自動で翻訳」（`setSite` でアプリの設定を
+  自動にし、ブラウザの許可を求め、このページも訳す）、自動のサイトでは「このサイトの自動翻訳を一時停止」／「自動翻訳を
+  再開」（一時停止は拡張機能がサイトごとに覚え、アプリの設定は自動のまま）。
+- 自動のサイト: 拡張機能はサイトに入る許可がないとページを開いたことも知れないので、自動のサイトで初めてメニューを
+  開いたときに一度だけ許可を求める（`permissions.request`、クリックが要る）。
+  - 「すべてのサイトで自動翻訳を使う」（おすすめ）: content script をすべてのページに登録し、ページを開くたびにアプリに
+    設定を聞く。以後はアプリで自動にするだけで、次に開いたページから訳される。自動でないページでは何もしない。
+  - 「このサイトだけ許可」: `sites` で自動のサイトを聞き、許可されたサイトだけに登録する。
+  - 登録は `scripting.registerContentScripts`。YouTube の字幕の翻訳はサイトの動作とは別（オフでも字幕は訳す）。
 

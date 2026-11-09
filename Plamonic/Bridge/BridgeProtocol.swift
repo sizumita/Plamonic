@@ -14,10 +14,12 @@ enum BridgeProtocol {
     /// Texts from the focus that go before everything on screen.
     static let defaultUrgentCount = 3
     static let maxUrgentCount = 20
+    /// Items of `visible` that count; a page rarely shows more paragraphs at once.
+    static let maxVisible = 60
     /// Texts in one `translate` request.
     static let maxTranslateTexts = 20
     /// What this app answers, listed in `hello` so a newer extension can tell what an older app offers.
-    static let features = ["documents", "translate"]
+    static let features = ["documents", "translate", "sites"]
 }
 
 /// The `id` the extension chose; echoed in the response. A number or a string.
@@ -53,6 +55,12 @@ struct BridgeRequest: Decodable, Equatable, Sendable {
         case close
         /// Translates a few texts once (a selection, a tooltip) ahead of background work; answers when done.
         case translate
+        /// The website settings for the page at `url` (DESIGN §9.4).
+        case site
+        /// The sites set to translate by themselves, for the extension to run on.
+        case sites
+        /// Sets the mode of the site of `url` in the settings (`mode`: off, automatic or manual); answers `site`.
+        case setSite
     }
 
     struct Item: Decodable, Equatable, Sendable {
@@ -71,6 +79,8 @@ struct BridgeRequest: Decodable, Equatable, Sendable {
     var items: [Item]?
     /// Id of the item being shown.
     var focus: String?
+    /// Ids of the items on screen, top to bottom (a page). They go first; without it, `urgent` items from the focus.
+    var visible: [String]?
     /// How many items from the focus are urgent.
     var urgent: Int?
     /// Items whose results the extension wants; nil = all of them.
@@ -81,6 +91,10 @@ struct BridgeRequest: Decodable, Equatable, Sendable {
     var sourceLanguage: String?
     /// For `translate`.
     var texts: [String]?
+    /// The page's address: `site` answers its settings; `sync` and `translate` apply its overrides.
+    var url: String?
+    /// For `setSite`.
+    var mode: String?
 }
 
 struct BridgeResponse: Encodable, Equatable, Sendable {
@@ -118,6 +132,21 @@ struct BridgeResponse: Encodable, Equatable, Sendable {
 
     // translate: one entry per text, null where it failed
     var translations: [String?]?
+
+    // site, sites
+    struct Site: Encodable, Equatable, Sendable {
+        var pattern: String
+        var name: String
+        /// off, automatic or manual.
+        var mode: String
+        var include: [String]
+        var exclude: [String]
+        /// user, preset or defaults (no settings for this site).
+        var source: String
+    }
+
+    var site: Site?
+    var sites: [Site]?
 
     static func failure(_ id: BridgeMessageID?, _ error: String, _ message: String) -> BridgeResponse {
         BridgeResponse(id: id, ok: false, error: error, message: message)

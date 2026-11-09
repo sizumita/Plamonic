@@ -1062,8 +1062,8 @@ final class TranslationCoordinator {
             }
         }
         for document in documents.values where document.plan.hasModel {
-            for entry in document.entries[document.focus...] {
-                guard let subject = entry.subject, seen.insert(subject).inserted else { continue }
+            for index in document.aheadIndices {
+                guard let subject = document.entries[index].subject, seen.insert(subject).inserted else { continue }
                 if !hasAnyTranslation(subject) { count += 1 }
             }
         }
@@ -1073,10 +1073,12 @@ final class TranslationCoordinator {
 
 // MARK: - Browser extension documents
 
-/// Texts sent by a browser extension, such as one video's captions in time order. The extension sends the whole
-/// list once and then keeps moving `focus` (what is being shown); jobs are picked from the latest state like a
-/// window's. The texts from the focus through `urgentCount` are translated before anything but manual requests;
-/// the rest is read ahead only when nothing on screen waits. Results are polled (`documentResults`).
+/// Texts sent by a browser extension: one video's captions in time order, or a page's paragraphs. The extension
+/// sends the whole list once and then keeps moving `focus` (what is being shown); jobs are picked from the latest
+/// state like a window's. The texts being shown (`visible`, or the focus and the `urgentCount` texts after it) are
+/// translated before anything but manual requests; the rest is read ahead only when nothing on screen waits:
+/// after the focus, and for a page (`readsAll`) then the part before it too. Results are polled
+/// (`documentResults`).
 extension TranslationCoordinator {
     struct ExternalDocumentKey: Hashable, Sendable {
         /// Who sent it, such as "chrome" or "safari".
@@ -1103,7 +1105,7 @@ extension TranslationCoordinator {
     }
 
     struct ExternalProgress: Equatable, Sendable {
-        /// Texts from the focus on that have a translation (or need none).
+        /// Texts still to read (from the focus on; all of a page) that have a translation (or need none).
         var done: Int
         var total: Int
     }
@@ -1125,21 +1127,38 @@ extension TranslationCoordinator {
         var subjects: Set<TranslationSubject>
         var focus: Int
         var urgentCount: Int
+        /// The texts on screen, top to bottom, when the extension says which (a page); else the urgent ones follow
+        /// the focus (captions).
+        var visible: [Int] = []
+        /// A page: everything is read ahead eventually, the part before the focus after the rest.
+        var readsAll = false
         /// Last time the extension asked about it; documents left alone expire.
         var lastUsed: Date
         /// Higher = updated more recently; goes first among documents.
         var sequence: Int
 
-        var urgentRange: Range<Int> { focus..<min(entries.count, focus + max(0, urgentCount)) }
+        /// What is translated before anything but manual requests.
+        var urgentIndices: [Int] {
+            if !visible.isEmpty { return visible }
+            return Array(focus..<min(entries.count, focus + max(0, urgentCount)))
+        }
+
+        /// What is read ahead, in order.
+        var aheadIndices: [Int] {
+            let after = Array(focus..<entries.count)
+            return readsAll ? after + Array(0..<min(focus, entries.count)) : after
+        }
     }
 
     /// Creates or replaces the document's texts (when `items` is given) and moves its focus to the item `focus`
-    /// (the first item when nil or unknown). Returns false when the document is unknown and `items` is nil: the
-    /// extension must send the texts again (the app restarted, or the document expired).
+    /// (the first item when nil or unknown). `visible` lists the items on screen when the extension knows them;
+    /// `readsAll` reads the whole document ahead, not only what follows the focus. Returns false when the document
+    /// is unknown and `items` is nil: the extension must send the texts again (the app restarted, or the document
+    /// expired).
     @discardableResult
     func updateDocument(
         _ key: ExternalDocumentKey, items: [ExternalItem]?, focus: String?, urgentCount: Int,
-        settings: EffectiveSettings
+        visible: [String]? = nil, readsAll: Bool = false, settings: EffectiveSettings
     ) -> Bool {
         let now = Date()
         pruneDocuments(now: now)
@@ -1162,6 +1181,8 @@ extension TranslationCoordinator {
         }
         document.focus = focus.flatMap { document.indexByID[$0] } ?? 0
         document.urgentCount = urgentCount
+        document.visible = (visible ?? []).compactMap { document.indexByID[$0] }
+        document.readsAll = readsAll
         document.lastUsed = now
         document.sequence = documentCounter
         documents[key] = document
@@ -1186,8 +1207,8 @@ extension TranslationCoordinator {
     func documentProgress(_ key: ExternalDocumentKey) -> ExternalProgress? {
         guard let document = documents[key] else { return nil }
         let now = Date()
-        let ahead = document.entries[document.focus...]
-        let done = ahead.filter { result(for: $0, in: document, now: now).state != .pending }.count
+        let ahead = document.aheadIndices
+        let done = ahead.filter { result(for: document.entries[$0], in: document, now: now).state != .pending }.count
         return ExternalProgress(done: done, total: ahead.count)
     }
 
@@ -1261,7 +1282,7 @@ extension TranslationCoordinator {
     private func urgentDocumentJob(_ documents: [ExternalDocument], now: Date) -> Job? {
         for document in documents {
             guard let model = document.plan.draft ?? document.plan.final else { continue }
-            for index in document.urgentRange {
+            for index in document.urgentIndices {
                 guard let subject = document.entries[index].subject, !hasAnyTranslation(subject),
                     !isBlocked(JobID(subject: subject, model: model), now: now)
                 else { continue }
@@ -1271,12 +1292,12 @@ extension TranslationCoordinator {
         return nil
     }
 
-    /// Reading ahead: the final translation of the texts about to be shown, then the texts after them, in order,
-    /// straight with the final model (there is time, so no draft first).
+    /// Reading ahead: the final translation of the texts being shown, then the texts after them (and for a page,
+    /// before them), in order, straight with the final model (there is time, so no draft first).
     private func prefetchDocumentJob(_ documents: [ExternalDocument], now: Date) -> Job? {
         for document in documents {
             guard let model = document.plan.final ?? document.plan.draft else { continue }
-            for index in document.focus..<document.entries.count {
+            for index in document.urgentIndices + document.aheadIndices {
                 guard let subject = document.entries[index].subject, !cache.contains(subject.key(for: model)),
                     !isBlocked(JobID(subject: subject, model: model), now: now)
                 else { continue }

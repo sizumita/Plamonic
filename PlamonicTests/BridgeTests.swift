@@ -9,13 +9,17 @@ private typealias F = TranslationTestFixtures
 final class BridgeTests: XCTestCase {
     @MainActor
     private func makeService(
-        _ backend: TranslationFakeBackend = TranslationFakeBackend(), configure: (inout GlobalSettings) -> Void = { _ in }
+        _ backend: TranslationFakeBackend = TranslationFakeBackend(), configure: (inout GlobalSettings) -> Void = { _ in },
+        sites configureSites: (inout [SiteProfile]) -> Void = { _ in }
     ) -> BridgeService {
-        var global = F.settings(draft: nil).global
-        configure(&global)
+        var document = SettingsDocument()
+        document.global = F.settings(draft: nil).global
+        configure(&document.global)
+        configureSites(&document.sites)
+        let snapshot = SettingsSnapshot(document: document)
         let coordinator = F.coordinator(backend)
         return BridgeService(
-            coordinator: coordinator, globalSettings: { global }, isReady: { _ in true }, appVersion: "9.9.9")
+            coordinator: coordinator, settings: { snapshot }, isReady: { _ in true }, appVersion: "9.9.9")
     }
 
     @MainActor
@@ -51,7 +55,7 @@ final class BridgeTests: XCTestCase {
         XCTAssertEqual(response["version"] as? String, "9.9.9")
         XCTAssertEqual(response["enabled"] as? Bool, true)
         XCTAssertEqual(response["targetLanguage"] as? String, "ja")
-        XCTAssertEqual(response["features"] as? [String], ["documents", "translate"])
+        XCTAssertEqual(response["features"] as? [String], ["documents", "translate", "sites"])
     }
 
     @MainActor

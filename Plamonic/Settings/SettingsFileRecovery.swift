@@ -28,23 +28,32 @@ enum SettingsFileRecovery {
             }
         }
 
-        if let rawProfiles = root["profiles"] {
-            guard let list = rawProfiles as? [Any] else {
-                problems.append("profiles")
-                return Result(document: doc, problems: problems)
-            }
-            for (index, item) in list.enumerated() {
-                guard let dict = item as? [String: Any], dict["bundleID"] is String,
-                    let (profile, dropped) = salvageObject(dict, as: AppProfile.self, requiredKeys: ["bundleID"])
-                else {
-                    problems.append("profiles[\(index)]")
-                    continue
-                }
-                doc.profiles.append(profile)
-                problems += dropped.map { "profiles[\(index)].\($0)" }
-            }
-        }
+        doc.profiles = salvageList(root["profiles"], name: "profiles", key: "bundleID", as: AppProfile.self, &problems)
+        doc.sites = salvageList(root["sites"], name: "sites", key: "pattern", as: SiteProfile.self, &problems)
         return Result(document: doc, problems: problems)
+    }
+
+    /// The entries of a list of profiles that decode (dropping fields that do not), each needing `key`.
+    private static func salvageList<T: Decodable>(
+        _ raw: Any?, name: String, key: String, as type: T.Type, _ problems: inout [String]
+    ) -> [T] {
+        guard let raw else { return [] }
+        guard let list = raw as? [Any] else {
+            problems.append(name)
+            return []
+        }
+        var values: [T] = []
+        for (index, item) in list.enumerated() {
+            guard let dict = item as? [String: Any], dict[key] is String,
+                let (value, dropped) = salvageObject(dict, as: type, requiredKeys: [key])
+            else {
+                problems.append("\(name)[\(index)]")
+                continue
+            }
+            values.append(value)
+            problems += dropped.map { "\(name)[\(index)].\($0)" }
+        }
+        return values
     }
 
     /// Decodes `T` from `dict`, dropping keys whose values do not decode. Returns nil if even the required keys fail.

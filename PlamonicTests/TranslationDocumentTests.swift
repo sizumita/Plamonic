@@ -84,6 +84,35 @@ final class TranslationDocumentTests: XCTestCase {
         XCTAssertEqual(backend.calls.map(\.request.text).prefix(2), [Self.captions[0], Self.captions[4]])
     }
 
+    /// A page says which paragraphs are on screen (a sticky header and the middle of the article, say): those go
+    /// first in that order, then the rest after the first one, then the part above it.
+    @MainActor
+    func testAPageTranslatesWhatIsOnScreenFirstThenAllTheRest() async throws {
+        let backend = TranslationFakeBackend()
+        let coordinator = F.coordinator(backend)
+        let settings = BridgeService.documentSettings(
+            global: F.settings(draft: nil).global, kind: "page", context: "", sourceLanguage: nil)
+        let paragraphs = (0..<8).map { "Paragraph number \($0) of the article." }
+        coordinator.updateDocument(
+            key, items: items(paragraphs), focus: "c0", urgentCount: 3, visible: ["c0", "c5", "c6"], readsAll: true,
+            settings: settings)
+        let done = await F.waitUntil { coordinator.documentResults(self.key)?.allSatisfy { $0.state == .final } == true }
+        XCTAssertTrue(done)
+        XCTAssertEqual(backend.calls.map(\.request.text), [0, 5, 6, 1, 2, 3, 4, 7].map { paragraphs[$0] })
+
+        // Scrolled down: what is on screen now goes first, and the paragraphs above are read last.
+        let other = Key(client: "chrome", id: "page-2")
+        backend.respond { text, _ in "訳: \(text)" }
+        let more = (0..<6).map { "Another page, paragraph \($0)." }
+        coordinator.updateDocument(
+            other, items: items(more), focus: "c3", urgentCount: 3, visible: ["c3", "c4"], readsAll: true,
+            settings: settings)
+        let all = await F.waitUntil { coordinator.documentResults(other)?.allSatisfy { $0.state == .final } == true }
+        XCTAssertTrue(all)
+        XCTAssertEqual(backend.calls.suffix(6).map(\.request.text), [3, 4, 5, 0, 1, 2].map { more[$0] })
+        XCTAssertEqual(coordinator.documentProgress(other), .init(done: 6, total: 6))
+    }
+
     @MainActor
     func testResultsCarryStatesAndSkipTextsInTheTargetLanguage() async throws {
         let backend = TranslationFakeBackend()

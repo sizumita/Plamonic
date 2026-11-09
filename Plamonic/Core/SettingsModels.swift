@@ -556,6 +556,8 @@ struct SettingsDocument: Codable, Equatable, Sendable {
     var global: GlobalSettings = GlobalSettings()
     /// Profiles the user created or edited. Presets that were never edited are not stored here.
     var profiles: [AppProfile] = []
+    /// Website profiles the user created or edited, for the browser extensions. Same rule as `profiles`.
+    var sites: [SiteProfile] = []
 
     init() {}
 
@@ -564,9 +566,10 @@ struct SettingsDocument: Codable, Equatable, Sendable {
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
         global = try c.decodeIfPresent(GlobalSettings.self, forKey: .global) ?? GlobalSettings()
         profiles = try c.decodeIfPresent([AppProfile].self, forKey: .profiles) ?? []
+        sites = try c.decodeIfPresent([SiteProfile].self, forKey: .sites) ?? []
     }
 
-    private enum CodingKeys: String, CodingKey { case version, global, profiles }
+    private enum CodingKeys: String, CodingKey { case version, global, profiles, sites }
 }
 
 /// The settings that apply to one app after merging its profile with the global settings.
