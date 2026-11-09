@@ -37,6 +37,20 @@ final class PlamoKVCache {
         return (keys![.ellipsis, ..<offset, 0...], values![.ellipsis, ..<offset, 0...])
     }
 
+    /// The filled part, [B, heads, offset, dim]; nil while empty.
+    var filled: (keys: MLXArray, values: MLXArray)? {
+        guard let keys, let values, offset > 0 else { return nil }
+        return (keys[.ellipsis, ..<offset, 0...], values[.ellipsis, ..<offset, 0...])
+    }
+
+    /// Replaces the contents with these arrays ([B, heads, length, dim]); nil empties the cache.
+    /// Growth on the next `update` copies them into a larger buffer.
+    func replace(with state: (keys: MLXArray, values: MLXArray)?) {
+        keys = state?.keys
+        values = state?.values
+        offset = state?.keys.dim(2) ?? 0
+    }
+
     /// Drops everything after the first `length` positions.
     func trim(to length: Int) {
         offset = max(0, min(offset, length))

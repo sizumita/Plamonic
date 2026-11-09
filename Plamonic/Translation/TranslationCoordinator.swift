@@ -2,11 +2,15 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-/// Turns window snapshots into overlay items and keeps one backend call running at a time.
+/// Turns window snapshots into overlay items and keeps up to `maxConcurrentJobs` backend calls running, all with
+/// the same model, so the engine generates them in one batch.
 ///
-/// Scheduling is pull-based: whenever the backend is idle the next job is chosen from the latest
+/// Scheduling is pull-based: whenever a slot is free the next job is chosen from the latest
 /// snapshot of every window, so jobs for segments that left the screen are dropped for free and
-/// identical texts (same `TranslationSubject`) are translated once.
+/// identical texts (same `TranslationSubject`) are translated once. A job joins the running ones only when it is
+/// the most urgent job left and uses their model; otherwise it waits until they finish, so a batch never holds back
+/// more urgent work of another model for longer than one job. A window that sends history waits for its earlier
+/// texts, so their translations are in the history.
 /// Priority: manual requests > first translations (each window's draft model, or its final model when it
 /// translates in one stage) > final jobs for text whose draft is backing off > final upgrades of drafts.
 /// Within a tier: windows of the frontmost app first, then the most recently scanned window, then top-to-bottom.
@@ -35,6 +39,9 @@ final class TranslationCoordinator {
         var installCheckInterval: TimeInterval = 1
         /// 混雑時の一時停止: arrivals within this many seconds count toward pausing the final stage.
         var burstArrivalWindow: TimeInterval = 2
+        /// Backend calls running at once (all with one model; the engine decodes them together). A few at a time
+        /// translate a screen of text roughly twice as fast; each one alone gets slower as more share the GPU.
+        var maxConcurrentJobs = 4
 
         init() {}
     }
@@ -64,7 +71,8 @@ final class TranslationCoordinator {
     private var burstSettings = BurstControlSettings()
     private var burstWakeTask: Task<Void, Never>?
     private var burstWakeDate: Date?
-    private var running: RunningJob?
+    /// Calls in progress, all with the same model; cancelled ones stay until they return.
+    private var running: [RunningJob] = []
     private var manualQueue: [UUID] = []
     private var manualWaiters: [UUID: ManualRequest] = [:]
     private var partials: [TranslationSubject: String] = [:]
@@ -171,17 +179,14 @@ final class TranslationCoordinator {
         pump()
     }
 
-    /// Stops all work: windows are forgotten, the running call is cancelled and waiting
+    /// Stops all work: windows are forgotten, running calls are cancelled and waiting
     /// `translateOnce` calls return nil. Cached translations are kept, and so are browser extension documents
     /// (they do not depend on 翻訳を有効にする; the next `sync` resumes their work).
     func cancelAll() {
         windows.removeAll()
         for id in manualQueue { manualWaiters.removeValue(forKey: id)?.continuation.resume(returning: nil) }
         manualQueue.removeAll()
-        if let running {
-            running.cancelled = true
-            running.task?.cancel()
-        }
+        for job in running { cancel(job) }
         partials.removeAll()
         resumableChunks.removeAll()
         failures.removeAll()
@@ -505,52 +510,78 @@ final class TranslationCoordinator {
     private func pump() {
         let now = Date()
         updateBurst(now: now)
-        if running == nil {
-            var manualJob: Job?
-            while manualJob == nil, !manualQueue.isEmpty {
-                manualJob = manualWaiters[manualQueue.removeFirst()]?.job
-            }
-            if let job = manualJob ?? nextJob() { start(job) }
-        } else if !manualQueue.isEmpty, let running, running.job.manualID == nil, !running.cancelled {
-            // An explicit request preempts background work; the dropped job is picked again later.
-            running.cancelled = true
-            running.task?.cancel()
-        }
+        startJobs()
         updateActivity()
         scheduleWakeIfNeeded()
         scheduleBurstWake()
     }
 
-    private func nextJob() -> Job? {
+    /// Fills free slots: manual requests first, then background jobs in priority order while the most urgent one
+    /// uses the running model.
+    private func startJobs() {
+        let capacity = max(1, configuration.maxConcurrentJobs)
+        while let id = manualQueue.first {
+            guard let job = manualWaiters[id]?.job else {
+                manualQueue.removeFirst()
+                continue
+            }
+            if running.count < capacity, running.allSatisfy({ $0.job.id.model == job.id.model }) {
+                manualQueue.removeFirst()
+                start(job)
+                continue
+            }
+            // An explicit request preempts background work; the dropped jobs are picked again later.
+            let background = running.filter { $0.job.manualID == nil && !$0.cancelled }
+            let otherModel = background.filter { $0.job.id.model != job.id.model }
+            if !otherModel.isEmpty {
+                for runningJob in otherModel { cancel(runningJob) }
+            } else if running.count >= capacity, !running.contains(where: \.cancelled), let newest = background.last {
+                cancel(newest)
+            }
+            return
+        }
+        while running.count < capacity, let job = nextJob(excluding: runningSubjects) {
+            guard running.allSatisfy({ $0.job.id.model == job.id.model }) else { break }
+            start(job)
+        }
+    }
+
+    private var runningSubjects: Set<TranslationSubject> { Set(running.map(\.job.id.subject)) }
+
+    /// The most urgent background job whose text is not being translated (`busy`).
+    private func nextJob(excluding busy: Set<TranslationSubject>) -> Job? {
         let now = Date()
         let ordered = orderedWindows()
         let documents = orderedDocuments()
 
         // Captions about to be shown come before everything but manual requests: they cannot wait.
-        if let job = urgentDocumentJob(documents, now: now) { return job }
-        if let job = firstStageJob(windows: ordered, now: now) { return job }
+        if let job = urgentDocumentJob(documents, now: now, excluding: busy) { return job }
+        if let job = firstStageJob(windows: ordered, now: now, excluding: busy) { return job }
         for window in ordered {
             // 混雑時の一時停止: while new text keeps flooding into this app, its drafts go first and its upgrades wait.
             guard let final = window.plan.final, !isRefinementPaused(window) else { continue }
             for (index, entry) in window.entries.enumerated()
-            where !cache.contains(entry.subject.key(for: final))
+            where !busy.contains(entry.subject) && !cache.contains(entry.subject.key(for: final))
                 && !isBlocked(JobID(subject: entry.subject, model: final), now: now)
+                && !waitsForHistory(index, in: window, busy: busy)
             {
                 return makeJob(entry, index: index, window: window, model: final)
             }
         }
         // Reading ahead in a document only uses time nothing on screen needs.
-        return prefetchDocumentJob(documents, now: now)
+        return prefetchDocumentJob(documents, now: now, excluding: busy)
     }
 
     /// The first translation of a text that has none: the window's draft model, its final model when it
     /// translates in one stage, or the final model when the draft is backing off.
-    private func firstStageJob(windows: [WindowState], now: Date) -> Job? {
+    private func firstStageJob(windows: [WindowState], now: Date, excluding busy: Set<TranslationSubject>) -> Job? {
         for window in windows {
             guard let model = window.plan.draft ?? window.plan.final else { continue }
             for index in firstStageOrder(window) {
                 let entry = window.entries[index]
-                guard !hasAnyTranslation(entry.subject), !isBlocked(JobID(subject: entry.subject, model: model), now: now)
+                guard !busy.contains(entry.subject), !hasAnyTranslation(entry.subject),
+                    !isBlocked(JobID(subject: entry.subject, model: model), now: now),
+                    !waitsForHistory(index, in: window, busy: busy)
                 else { continue }
                 return makeJob(entry, index: index, window: window, model: model)
             }
@@ -558,14 +589,22 @@ final class TranslationCoordinator {
         for window in windows {
             guard let draft = window.plan.draft, let final = window.plan.final else { continue }
             for (index, entry) in window.entries.enumerated()
-            where !hasAnyTranslation(entry.subject)
+            where !busy.contains(entry.subject) && !hasAnyTranslation(entry.subject)
                 && isBlocked(JobID(subject: entry.subject, model: draft), now: now)
                 && !isBlocked(JobID(subject: entry.subject, model: final), now: now)
+                && !waitsForHistory(index, in: window, busy: busy)
             {
                 return makeJob(entry, index: index, window: window, model: final)
             }
         }
         return nil
+    }
+
+    /// A window that sends history translates in reading order: a text waits while an earlier one is being
+    /// translated, so that translation is in its history.
+    private func waitsForHistory(_ index: Int, in window: WindowState, busy: Set<TranslationSubject>) -> Bool {
+        guard !busy.isEmpty, window.settings.profile.useConversationHistory else { return false }
+        return window.entries[..<index].contains { busy.contains($0.subject) }
     }
 
     /// Reading order, except while the window's final stage is paused for a flood of new text: then the newest
@@ -585,12 +624,12 @@ final class TranslationCoordinator {
         }
     }
 
-    /// Whether `nextJob()` would pick a first-stage job now.
+    /// Whether a first-stage job that is not running yet is waiting.
     private func hasFirstStageJob() -> Bool {
         let now = Date()
-        if urgentDocumentJob(Array(documents.values), now: now) != nil { return true }
+        if urgentDocumentJob(Array(documents.values), now: now, excluding: runningSubjects) != nil { return true }
         guard !windows.isEmpty else { return false }
-        return firstStageJob(windows: Array(windows.values), now: now) != nil
+        return firstStageJob(windows: Array(windows.values), now: now, excluding: runningSubjects) != nil
     }
 
     private func orderedWindows() -> [WindowState] {
@@ -659,7 +698,7 @@ final class TranslationCoordinator {
                 self.receivePartial(text, from: runningJob)
             }
         }
-        running = runningJob
+        running.append(runningJob)
         runningJob.task = Task { [weak self] in
             guard let self else { return }
             let result = await self.execute(job, relay: runningJob.relay)
@@ -742,7 +781,7 @@ final class TranslationCoordinator {
     }
 
     private func receivePartial(_ text: String, from runningJob: RunningJob) {
-        guard running === runningJob, !runningJob.cancelled else { return }
+        guard running.contains(where: { $0 === runningJob }), !runningJob.cancelled else { return }
         let subject = runningJob.job.id.subject
         guard partials[subject] != text else { return }
         partials[subject] = text
@@ -750,8 +789,8 @@ final class TranslationCoordinator {
     }
 
     private func finish(_ runningJob: RunningJob, result: Result<String, Error>) {
-        guard running === runningJob else { return }
-        running = nil
+        guard let index = running.firstIndex(where: { $0 === runningJob }) else { return }
+        running.remove(at: index)
         runningJob.relay?.cancel()
         let job = runningJob.job
         let subject = job.id.subject
@@ -785,13 +824,18 @@ final class TranslationCoordinator {
     }
 
     private func cancelRunningJobIfStale() {
-        guard let running, running.job.manualID == nil, !running.cancelled else { return }
-        let subject = running.job.id.subject
-        guard !windows.values.contains(where: { $0.knows(subject) }),
-            !documents.values.contains(where: { $0.subjects.contains(subject) })
-        else { return }
-        running.cancelled = true
-        running.task?.cancel()
+        for runningJob in running where runningJob.job.manualID == nil && !runningJob.cancelled {
+            let subject = runningJob.job.id.subject
+            guard !windows.values.contains(where: { $0.knows(subject) }),
+                !documents.values.contains(where: { $0.subjects.contains(subject) })
+            else { continue }
+            cancel(runningJob)
+        }
+    }
+
+    private func cancel(_ runningJob: RunningJob) {
+        runningJob.cancelled = true
+        runningJob.task?.cancel()
     }
 
     private func cancelManual(_ id: UUID) {
@@ -799,9 +843,8 @@ final class TranslationCoordinator {
             manualQueue.remove(at: index)
             resolveManual(id, with: nil)
             updateActivity()
-        } else if let running, running.job.manualID == id {
-            running.cancelled = true
-            running.task?.cancel()
+        } else if let runningJob = running.first(where: { $0.job.manualID == id }) {
+            cancel(runningJob)
         }
     }
 
@@ -947,15 +990,16 @@ final class TranslationCoordinator {
             // An app with no window left has nothing worth remembering.
             bursts[pid] = burst.isPaused || live.contains(pid) ? burst : nil
         }
-        guard anyPaused, let running, running.job.isUpgrade, running.job.manualID == nil, !running.cancelled
-        else { return }
-        let job = running.job.id
-        let wanted = windows.values.contains {
-            $0.subjects.contains(job.subject) && $0.plan.final == job.model && !isRefinementPaused($0)
+        guard anyPaused else { return }
+        for runningJob in running
+        where runningJob.job.isUpgrade && runningJob.job.manualID == nil && !runningJob.cancelled {
+            let job = runningJob.job.id
+            // A browser extension document's upgrades are not part of any app's burst.
+            let wanted = windows.values.contains {
+                $0.subjects.contains(job.subject) && $0.plan.final == job.model && !isRefinementPaused($0)
+            } || documents.values.contains { $0.subjects.contains(job.subject) && $0.plan.final == job.model }
+            if !wanted { cancel(runningJob) }
         }
-        guard !wanted else { return }
-        running.cancelled = true
-        running.task?.cancel()
     }
 
     /// Distinct on-screen texts still waiting for their first translation, counted up to `limit`.
@@ -1039,7 +1083,7 @@ final class TranslationCoordinator {
     private func updateActivity() {
         let status = orderedWindows().first
         let next = TranslationActivity(
-            plan: status?.plan ?? lastPlan, runningModel: running?.job.id.model,
+            plan: status?.plan ?? lastPlan, runningModel: running.first?.job.id.model,
             remainingJobs: remainingJobCount() + manualQueue.count, lastError: lastError,
             refinementPaused: status.map { isRefinementPaused($0) } ?? false)
         guard next != activity else { return }
@@ -1279,12 +1323,15 @@ extension TranslationCoordinator {
     }
 
     /// The first translation of a text about to be shown: the draft model when the plan has one.
-    private func urgentDocumentJob(_ documents: [ExternalDocument], now: Date) -> Job? {
+    private func urgentDocumentJob(
+        _ documents: [ExternalDocument], now: Date, excluding busy: Set<TranslationSubject>
+    ) -> Job? {
         for document in documents {
             guard let model = document.plan.draft ?? document.plan.final else { continue }
             for index in document.urgentIndices {
-                guard let subject = document.entries[index].subject, !hasAnyTranslation(subject),
-                    !isBlocked(JobID(subject: subject, model: model), now: now)
+                guard let subject = document.entries[index].subject, !busy.contains(subject),
+                    !hasAnyTranslation(subject), !isBlocked(JobID(subject: subject, model: model), now: now),
+                    !documentWaitsForHistory(index, in: document, busy: busy)
                 else { continue }
                 return makeDocumentJob(document, index: index, model: model)
             }
@@ -1294,17 +1341,33 @@ extension TranslationCoordinator {
 
     /// Reading ahead: the final translation of the texts being shown, then the texts after them (and for a page,
     /// before them), in order, straight with the final model (there is time, so no draft first).
-    private func prefetchDocumentJob(_ documents: [ExternalDocument], now: Date) -> Job? {
+    private func prefetchDocumentJob(
+        _ documents: [ExternalDocument], now: Date, excluding busy: Set<TranslationSubject>
+    ) -> Job? {
         for document in documents {
             guard let model = document.plan.final ?? document.plan.draft else { continue }
             for index in document.urgentIndices + document.aheadIndices {
-                guard let subject = document.entries[index].subject, !cache.contains(subject.key(for: model)),
-                    !isBlocked(JobID(subject: subject, model: model), now: now)
+                guard let subject = document.entries[index].subject, !busy.contains(subject),
+                    !cache.contains(subject.key(for: model)),
+                    !isBlocked(JobID(subject: subject, model: model), now: now),
+                    !documentWaitsForHistory(index, in: document, busy: busy)
                 else { continue }
                 return makeDocumentJob(document, index: index, model: model)
             }
         }
         return nil
+    }
+
+    /// Whether the text right before this one is being translated while history is on: its translation is this
+    /// one's history, so this one waits for it (as `waitsForHistory` does for windows).
+    private func documentWaitsForHistory(
+        _ index: Int, in document: ExternalDocument, busy: Set<TranslationSubject>
+    ) -> Bool {
+        guard !busy.isEmpty, index > 0, document.settings.profile.useConversationHistory else { return false }
+        for entry in document.entries[..<index].reversed() {
+            if let subject = entry.subject { return busy.contains(subject) }
+        }
+        return false
     }
 
     private func makeDocumentJob(_ document: ExternalDocument, index: Int, model: ModelSize) -> Job {

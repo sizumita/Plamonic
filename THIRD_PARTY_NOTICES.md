@@ -51,6 +51,9 @@ repositories (these files are the same in every model size). Paths are relative 
 | `Tokenizer/PlamoTokenizer.swift` | `tokenization_plamo.py` |
 | `PlamoPromptBuilder.swift` | `chat_template.jinja` (builds the same prompts in Swift) |
 
+`Generation/PlamoBatchGenerator.swift` is not a port, but it follows the design of mlx-lm's `BatchGenerator` and
+`BatchKVCache` (left-padded rows with per-row positions and masks).
+
 What the original files and repositories state:
 
 - `modeling_plamo_mlx.py` starts with this notice:
@@ -76,7 +79,8 @@ Built with PLaMo.
 
 `Packages/PlamoKit/Tests/PlamoKitTests/Fixtures/reference*.json` contain prompts, token IDs, logits and translations
 generated with the PLaMo 3 Translate 0.8B and 2B models and mlx-lm. `tokenizer-cases.json` contains token IDs produced
-by the PLaMo tokenizer. Both are output of PLaMo 3 Translate (see Article 5 of the PLaMo Community License).
+by the PLaMo tokenizer. Both are output of PLaMo 3 Translate (see Article 5 of the PLaMo Community License). The terms
+of the PLaMo Community License apply to any model trained using this data.
 
 ## MLX Swift and the code it builds
 
@@ -105,7 +109,7 @@ sais-lite, an Ed25519 implementation and `SUSignatureVerifier.m`), is reproduced
 ### PLaMo Community License
 
 Applies to the files ported from the PLaMo 3 Translate model repositories and to the test data generated with the
-models. The English and Japanese texts, as published in the model repositories, are in
+models. The English and Japanese texts (revised on November 9, 2026), as published in the model repositories, are in
 [LICENSES/PLaMo-Community-License.txt](LICENSES/PLaMo-Community-License.txt) and
 [LICENSES/PLaMo-Community-License.ja.txt](LICENSES/PLaMo-Community-License.ja.txt).
 

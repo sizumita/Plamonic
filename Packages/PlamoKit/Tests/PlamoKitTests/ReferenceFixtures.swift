@@ -5,6 +5,7 @@ import XCTest
 
 /// Reference data from the Python models run with mlx-lm (Fixtures/reference*.json).
 /// The fixtures are output of PLaMo 3 Translate (PLaMo Community License); see THIRD_PARTY_NOTICES.md.
+/// The license's terms also apply to any model trained using them.
 struct ReferenceFile {
     struct Case {
         var kwargs: [String: Any]

@@ -10,7 +10,7 @@ let usage = """
       tokenize  [-m <variant|path>] [--tokens] [text]          token ids for text (stdin if omitted)
       translate -m <variant|path> -t <lang> [--source <lang>] [--form plain|polite]
                 [--context <text>] [--max-tokens N] [--stream] [text]
-      bench     -m <variant|path> [--runs N]                   load time, prompt tok/s, gen tok/s, memory
+      bench     -m <variant|path> [--runs N]                   load time, prompt tok/s, gen tok/s, batching, memory
       download  <variant> [--root <dir>]                       download from Hugging Face
       verify    <variant> [--root <dir>]                       validate files and write .complete
       list      [--root <dir>]                                 installed variants
@@ -240,6 +240,56 @@ func runBench(_ args: Arguments) async throws {
     print(
         "generation: \(generated) tokens, median \(fmt(genRates[genRates.count / 2])) tok/s, "
             + "best \(fmt(genRates.last!)) tok/s")
+
+    // 4. Batched generation: 16 requests one after another, then up to N at a time (median of 3 rounds).
+    let sentences = [
+        "The meeting has been moved to next Monday.",
+        "Please restart the application after installing the update.",
+        "I left my umbrella on the train this morning.",
+        "Could you send me the slides from yesterday's presentation?",
+        "The weather forecast says it will snow tomorrow night.",
+        "Our team finished the migration two days ahead of schedule.",
+        "This function returns nil when the file does not exist.",
+        "Thanks for the quick review, I'll merge it after lunch.",
+    ]
+    let requests = ["ja", "zh-hans"].flatMap { target in
+        sentences.map { PlamoTranslationRequest(text: $0, targetLanguage: target) }
+    }
+    func translateAll(width: Int) async throws -> (TimeInterval, Int) {
+        await engine.setMaxBatchSize(width)
+        let started = Date()
+        // Like the app: at most `width` translations in flight, the next one starts when one finishes.
+        let tokens = try await withThrowingTaskGroup(of: Int.self) { tasks in
+            var next = 0
+            var total = 0
+            func add() {
+                let request = requests[next]
+                next += 1
+                tasks.addTask { try await engine.translate(request, modelDirectory: dir).generatedTokens }
+            }
+            while next < min(width, requests.count) { add() }
+            while let done = try await tasks.next() {
+                total += done
+                if next < requests.count { add() }
+            }
+            return total
+        }
+        return (Date().timeIntervalSince(started), tokens)
+    }
+    await engine.setPromptCacheReuse(true)
+    var baseline = 0.0
+    for width in [1, 2, 4, 8] {
+        _ = try await translateAll(width: width)  // compiles the kernels for these batch shapes
+        var rounds = [(TimeInterval, Int)]()
+        for _ in 0 ..< 3 { rounds.append(try await translateAll(width: width)) }
+        rounds.sort { $0.0 < $1.0 }
+        let (elapsed, tokens) = rounds[1]
+        if width == 1 { baseline = elapsed }
+        print(
+            "batch \(width): \(requests.count) translations in \(fmt(elapsed * 1000)) ms, "
+                + "\(fmt(Double(tokens) / elapsed)) tok/s, \(fmt(baseline / elapsed, 2))x")
+    }
+    await engine.setMaxBatchSize(8)
     print(memoryLine("after runs"))
 }
 

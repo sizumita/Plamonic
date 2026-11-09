@@ -30,8 +30,9 @@ Packages/PlamoKit (Swift Package, mlx-swift 0.32.3 のみに依存)
 ├── PlamoPromptBuilder  PFML3 プロンプト生成（chat_template.jinja と同じ出力）
 ├── Plamo3Model         modeling_plamo_mlx.py の移植（RMSNorm offset、SourceRoPE、SWA/全体注意）
 ├── PlamoGenerator      prefill + 貪欲デコード、ストリーミング、停止トークン、プレフィックス KV 再利用
+├── PlamoBatchGenerator 同じモデルの複数リクエストを 1 つのバッチでデコード（連続バッチング）
 ├── PlamoModelStore     Hugging Face からのダウンロード、配置、削除
-└── PlamoTranslationEngine (actor) 複数モデルのロード管理、直列実行、アイドル時アンロード
+└── PlamoTranslationEngine (actor) 複数モデルのロード管理、バッチの駆動、アイドル時アンロード
 plamo-cli               コマンドラインツール（tokenize / translate / bench / download / verify / list）
 ```
 
@@ -401,6 +402,20 @@ c は「<アプリ名> がパスワードを待っているため、このウイ
   件数の上限は設定値（1,000〜50,000）と「表示中の文章数 × 2 + 256」の大きいほう（表示中の訳文を追い出さない）。
 - 用語集は訳語が空の用語を送らない（PLaMo は空の訳語を受け付けず、その原語を含む文章がずっと失敗するため）。
 - 推論は 1 本の直列キュー（MLX の評価は直列化する）。下書きジョブを優先し、空いた時間に仕上げを進める。
+- 同時に走らせる翻訳は最大 4 件（`maxConcurrentJobs`）で、すべて同じモデル。エンジンはそれらを 1 つのバッチで
+  デコードする（下の「バッチ生成」）。次のジョブは、残りのジョブで最も急ぐものが走っているジョブと同じモデルのときだけ
+  加わる。違うモデルなら走っている分が終わるのを待つので、仕上げのバッチが新しい文章の下書きを待たせるのは 1 件分の
+  時間まで。手動の翻訳は、同じモデルで空きがあれば加わり、なければ違うモデルのジョブを取り消して先に走る。
+  会話の履歴を送るウインドウは、前の文章を訳している間は次の文章を始めない（その訳を履歴に入れるため）。
+- バッチ生成（`PlamoBatchGenerator`、mlx-lm の BatchGenerator / BatchKVCache と同じ考え方）: デコードの 1 ステップは
+  重みの読み出しと小さなカーネルの発行で決まり、数件まとめても 1 件とあまり変わらない。プロンプトは 1 件ずつ
+  これまでと同じ prefill（プレフィックス KV 再利用つき）で処理し、その K/V をバッチのキャッシュに行として足す。
+  行は左を空けて末尾をそろえ、空きはマスクで隠し、RoPE の位置は行ごとに持つので、どの行も単独のときと同じ計算になる
+  （参照出力のテストは短文と窓を超える長文を混ぜたバッチでも一致する）。終わった行はすぐ抜け、待っているリクエストが
+  入る。1 ステップで prefill するのは 1 件まで（まとめて入れると、走っている行のストリーミングが止まるため）。
+  M4 での実測（`plamo-cli bench`、短文 16 件）: 1 件ずつに対して 4 件同時で 0.8B 1.6 倍 / 軽量版 1.8 倍、8 件同時で
+  1.7 倍 / 2.0 倍。デコードだけなら 1 ステップ 9.5 ms（1 件）→ 15 ms（4 件）→ 25 ms（8 件）で、prefill（短文で
+  1 件約 23 ms）は 1 件ずつのまま。
   長い文章（複数チャンク）の仕上げの差し替えは、未翻訳の文章が現れるとチャンクの切れ目で譲り、その下書きを先に出す。
   中断した差し替えは済んだチャンクを覚えていて、次に選ばれたとき続きのチャンクから再開する。
 
@@ -742,7 +757,8 @@ c は「<アプリ名> がパスワードを待っているため、このウイ
 - PlamoKit のうちモデルのリポジトリから移植したコード（モデル、トークナイザー、プロンプト）と、モデルで作った
   テストデータにも PLaMo Community License が及ぶ。モデルのリポジトリと同じライセンス文（英語・日本語）を
   `LICENSES/` に置いてアプリにも同梱し、README、THIRD_PARTY_NOTICES.md、設定の「モデル」のライセンス欄に
-  「Built with PLaMo」と書く（第 4 条）。
+  「Built with PLaMo」と書く（第 4 条）。テストデータを公開しているので、それを使って学習したモデルにもライセンスの
+  条件が適用されることを README と THIRD_PARTY_NOTICES.md に書く（第 5 条第 4 項、2026 年 11 月 9 日の改定で追加）。
 
 ### 7.1 アップデート（`Updates/`）
 
@@ -779,7 +795,7 @@ c は「<アプリ名> がパスワードを待っているため、このウイ
 | Slack | Electron | DOM クラス `p-rich_text_*` を項目に |
 | Discord | Electron | DOM クラス接頭辞 `messageContent_` / `embedDescription_` |
 | Claude（Claude Code タブ） | Electron | `group/message-row` を項目、`group/status`・`sr-only` を除外 |
-| OpenCode | Electron + CLI | `scroll-view__viewport` をコンテナ、`tool-collapsible` を除外 |
+| OpenCode | Electron + CLI | `scroll-view__viewport` 内の段落（展開した思考やツールの説明文を含む）を翻訳、`sticky` と `sr-only` を除外 |
 | DeepSeek Harness | Electron | AXWebArea の汎用段落規則（未検証） |
 | Codex | CLI はターミナルモード。デスクトップ版は AXWebArea の汎用規則（未検証） | ターミナルモード |
 | Safari / Google Chrome | ブラウザ（Edge・Brave は Chrome と同じ方式で未検証） | AXWebArea の汎用ページ規則（banner・nav・search・footer・コードブロックを除外）、既定は手動。Chromium は AXEnhancedUserInterface |
