@@ -11,12 +11,15 @@ export interface Settings {
   sidebarShowsOriginal: boolean;
   /** The sidebar keeps the current line in view. */
   sidebarAutoScroll: boolean;
+  /** On X, posts that X translated by itself (with Grok) are shown in PLaMo's translation instead. */
+  replaceGrokTranslation: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   captionOverlay: "off",
   sidebarShowsOriginal: true,
   sidebarAutoScroll: true,
+  replaceGrokTranslation: false,
 };
 
 const KEY = "settings";

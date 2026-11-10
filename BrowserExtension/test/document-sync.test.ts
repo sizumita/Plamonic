@@ -30,6 +30,7 @@ function fakeApp(options: { forgetAfter?: number; unreachableFor?: number } = {}
     toggleSidebar: () => {},
     finished: () => {},
     site: () => undefined,
+    isRunning: () => false,
     pauseSite: () => {},
   };
   return { context, requests };

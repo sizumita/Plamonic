@@ -46,6 +46,11 @@ export interface FeatureInstance {
   /** A sidebar opened for this tab (a feature may wait for one before doing work only it shows). */
   sidebarOpened?(): void;
   settingsChanged?(settings: Settings): void;
+  /**
+   * The app's settings for this page's site were read (`FeatureContext.site()`): when the page opened, and again
+   * when a single-page site moved to an address that may have settings of its own (a path pattern).
+   */
+  siteChanged?(): void;
 }
 
 export interface FeatureContext {
@@ -66,6 +71,8 @@ export interface FeatureContext {
   finished(): void;
   /** This site's settings in the app (Settings › Webサイト), once known; undefined when the app is not reachable. */
   site(): SiteInfo | undefined;
+  /** Whether another feature runs on this page now (by its id), for features that must not do the same work twice. */
+  isRunning(featureID: string): boolean;
   /** Stops the feature and keeps it from starting by itself on this site until resumed from the menu. */
   pauseSite(): void;
 }

@@ -1,5 +1,6 @@
 import type { Feature } from "../content/feature";
 import { pageTranslation } from "./page";
+import { postButtons } from "./posts";
 import { youtubeCaptions } from "./youtube";
 
 /**
@@ -7,4 +8,4 @@ import { youtubeCaptions } from "./youtube";
  * scripts/build.mjs); manual ones are offered in the toolbar menu. The first one with a sidebar view owns the
  * sidebar.
  */
-export const FEATURES: Feature[] = [youtubeCaptions, pageTranslation];
+export const FEATURES: Feature[] = [youtubeCaptions, postButtons, pageTranslation];

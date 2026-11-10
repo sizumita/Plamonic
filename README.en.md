@@ -91,6 +91,9 @@ extensions send nothing off your Mac either.
   plays. Click a line to jump there. The extension can also show the translation on the video in place of the captions.
 - **Page translation**: choose このページを翻訳 (translate this page) from the Plamonic toolbar menu. The paragraphs on
   screen are translated first and the rest after. Rest the pointer on a translation to see the original.
+- **One post at a time**: on X posts and YouTube comments, a PLaMoで翻訳 (translate with PLaMo) button sits next to the
+  site's own translate button and translates just that post in place. On X, the extension can also show PLaMo's
+  translation in place of the one X makes by itself with Grok.
 - **Per-site settings**: in 設定 › Webサイト, set each site to automatic, manual or off, and choose where to translate
   with CSS selectors. Sites set to automatic are translated as soon as you open them. YouTube, X, Reddit, GitHub,
   Wikipedia and Hacker News have presets.

@@ -90,6 +90,7 @@ class ContentHost {
     this.site = site;
     this.siteURL = url;
     this.paused = site ? await isPaused(site.pattern) : false;
+    for (const { instance } of [...this.running.values()]) instance.siteChanged?.();
     if (site?.mode === "off") {
       // A single-page site moved into a part set never to translate: what was translating stops.
       for (const [id, { feature }] of [...this.running]) if (feature.followsSiteMode) this.stop(id);
@@ -167,6 +168,7 @@ class ContentHost {
       toggleSidebar: () => void this.toggleSidebar(),
       finished: () => this.stop(feature.id),
       site: () => this.site,
+      isRunning: (id) => this.running.has(id),
       pauseSite: () => {
         if (!this.site) return;
         this.paused = true;
