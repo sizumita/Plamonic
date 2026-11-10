@@ -46,6 +46,11 @@ export interface FeatureInstance {
   /** A sidebar opened for this tab (a feature may wait for one before doing work only it shows). */
   sidebarOpened?(): void;
   settingsChanged?(settings: Settings): void;
+  /**
+   * The app's settings for this page's site were read (`FeatureContext.site()`): when the page opened, and again
+   * when a single-page site moved to an address that may have settings of its own (a path pattern).
+   */
+  siteChanged?(): void;
 }
 
 export interface FeatureContext {

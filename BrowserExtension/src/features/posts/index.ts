@@ -97,10 +97,13 @@ export class PostButtons implements FeatureInstance {
   private counter = 0;
   private target: string | undefined;
   private targetAskedAt = 0;
+  private targetAsks = 0;
   private observer: MutationObserver | undefined;
   private scanTimer: ReturnType<typeof setTimeout> | undefined;
   private warned = false;
   private stopped = false;
+  /** The pattern of the app's website settings that apply here (a single-page site may move to another one). */
+  private profile: string | undefined;
   private readonly onClick = (event: MouseEvent) => this.siteControlClicked(event);
   private popup = new OriginalPopup(
     `[${COPY_ATTRIBUTE}]`,
@@ -126,6 +129,7 @@ export class PostButtons implements FeatureInstance {
     });
     document.addEventListener("click", this.onClick, true);
     this.popup.attach();
+    this.profile = this.context.site()?.pattern;
     if (this.site.needsTarget) void this.askTarget();
     this.scheduleScan();
   }
@@ -148,6 +152,29 @@ export class PostButtons implements FeatureInstance {
   }
 
   settingsChanged() {
+    this.scheduleScan(0);
+  }
+
+  /**
+   * The site's settings in the app are known (the buttons go away on a site set to オフ). When the page moved to a
+   * part of the site with other settings (a path pattern with its own target language, form or context), what was
+   * learned under the previous ones is let go: the target language is asked again, translations are no longer
+   * remembered, and the document is closed so that the next one is sent with this page's address. Translations
+   * already on the page stay.
+   */
+  siteChanged() {
+    const profile = this.context.site()?.pattern;
+    if (profile !== undefined && profile !== this.profile) {
+      const moved = this.profile !== undefined;
+      this.profile = profile;
+      if (moved) {
+        this.remembered.clear();
+        this.sync?.stop();
+        this.sync = undefined;
+        this.sentIds = "";
+        if (this.site.needsTarget) void this.askTarget();
+      }
+    }
     this.scheduleScan(0);
   }
 
@@ -241,11 +268,15 @@ export class PostButtons implements FeatureInstance {
     if (post && !post.translated && post.toggle && this.replaced.has(text)) post.toggle.click();
   }
 
+  private nextId(): string {
+    return `p${this.counter++}`;
+  }
+
   private add(text: HTMLElement): Entry {
     const button = document.createElement(BUTTON_TAG);
     button.setAttribute("role", "button");
     button.tabIndex = 0;
-    const entry: Entry = { id: `p${this.counter++}`, text, button, state: "idle", reverting: false, byUser: false, settled: false };
+    const entry: Entry = { id: this.nextId(), text, button, state: "idle", reverting: false, byUser: false, settled: false };
     // The sites open the post on a click anywhere in it, and have keyboard shortcuts.
     button.addEventListener("click", (event) => {
       event.preventDefault();
@@ -280,6 +311,9 @@ export class PostButtons implements FeatureInstance {
     entry.copy?.remove();
     entry.copy = undefined;
     entry.text.removeAttribute(HIDDEN_ATTRIBUTE);
+    // What the app answers for the old id is for the text sent then, which may not be this element's text any more
+    // (a reused comment element); the document keeps its results by id.
+    entry.id = this.nextId();
     entry.state = "idle";
     entry.source = undefined;
     entry.paragraph = undefined;
@@ -380,8 +414,10 @@ export class PostButtons implements FeatureInstance {
 
   private async askTarget() {
     this.targetAskedAt = Date.now();
+    const asked = ++this.targetAsks;
     const hello = await this.context.bridge({ type: "hello", url: location.href });
-    if (!hello.ok || !hello.targetLanguage || this.stopped) return;
+    // An answer for an address the page has left since must not replace a newer one.
+    if (!hello.ok || !hello.targetLanguage || this.stopped || asked !== this.targetAsks) return;
     this.target = hello.targetLanguage;
     this.scheduleScan(0);
   }
