@@ -5,6 +5,7 @@ import { showToast } from "../../content/toast";
 import { validSelectors } from "../../shared/sites";
 import { BlockFinder, normalizeText } from "./blocks";
 import { OriginalPopup } from "./original-popup";
+import { planParagraph, renderTranslation, type Paragraph } from "./rich-text";
 
 /**
  * Translates the page's text in place: the paragraphs on screen first, then the rest of the page, and new ones
@@ -24,9 +25,13 @@ interface Block {
   id: string;
   element: Element;
   text: string;
-  /** The element's children before translation, put back when translation stops. */
+  /** Its links and formatting, and what is sent to the app (the text with them marked). */
+  paragraph: Paragraph;
+  /** The children of `paragraph.target` before translation, put back when translation stops. */
   original?: Node[];
-  /** The translation shown now. */
+  /** The app's translation shown now. */
+  result?: string;
+  /** Its text as shown (markers removed). */
   shown?: string;
 }
 
@@ -151,7 +156,12 @@ class PageTranslation implements FeatureInstance {
     let added = 0;
     for (const element of elements) {
       if (this.byElement.has(element)) continue;
-      const block: Block = { id: `b${this.counter++}`, element, text: normalizeText(element.textContent ?? "") };
+      const block: Block = {
+        id: `b${this.counter++}`,
+        element,
+        text: normalizeText(element.textContent ?? ""),
+        paragraph: planParagraph(element),
+      };
       this.blocks.push(block);
       this.byElement.set(element, block);
       added++;
@@ -160,12 +170,17 @@ class PageTranslation implements FeatureInstance {
   }
 
   private items(): SyncItem[] {
-    return this.blocks.map((block) => ({ id: block.id, text: block.text }));
+    return this.blocks.map(({ id, paragraph: { markup } }) => ({
+      id,
+      text: markup.plain,
+      input: markup.input === markup.plain ? undefined : markup.input,
+    }));
   }
 
   /**
    * New paragraphs, and paragraphs whose text is no longer what we left there (our translation, or the original
-   * we sent): the site rewrote or reused them, so they are taken again as new text.
+   * we sent) or whose inner element we write into was replaced: the site rewrote or reused them, so they are taken
+   * again as new text.
    */
   private rescan() {
     let changed = false;
@@ -174,9 +189,10 @@ class PageTranslation implements FeatureInstance {
         changed = true;
         continue;
       }
-      if (normalizeText(block.element.textContent ?? "") !== this.expectedText(block)) {
+      if (this.isStale(block)) {
         this.byElement.delete(block.element);
         block.original = undefined;
+        block.result = undefined;
         block.shown = undefined;
         block.element.removeAttribute("data-plamonic-translated");
         changed = true;
@@ -190,7 +206,17 @@ class PageTranslation implements FeatureInstance {
   }
 
   private expectedText(block: Block) {
-    return block.shown !== undefined ? normalizeText(block.shown) : block.text;
+    return block.shown ?? block.text;
+  }
+
+  /**
+   * The site changed the paragraph since we planned it: its text is not what we left there, or the element we
+   * write into is no longer in it (replaced by one with the same text).
+   */
+  private isStale(block: Block) {
+    const target = block.paragraph.target;
+    if (target !== block.element && !block.element.contains(target)) return true;
+    return normalizeText(block.element.textContent ?? "") !== this.expectedText(block);
   }
 
   /**
@@ -244,9 +270,9 @@ class PageTranslation implements FeatureInstance {
     for (const block of this.blocks) {
       const result = sync.results.get(block.id);
       if (!result?.text || (result.state !== "draft" && result.state !== "final")) continue;
-      if (block.shown === result.text || !block.element.isConnected) continue;
+      if (block.result === result.text || !block.element.isConnected) continue;
       // The site put other text here since: it is translated anew with the next scan, not given this one.
-      if (normalizeText(block.element.textContent ?? "") !== this.expectedText(block)) {
+      if (this.isStale(block)) {
         this.scheduleRescan();
         continue;
       }
@@ -254,9 +280,12 @@ class PageTranslation implements FeatureInstance {
       const state = result.state;
       written.push(block.element);
       updates.push(() => {
-        block.original ??= [...block.element.childNodes];
-        block.shown = text;
-        block.element.textContent = text;
+        const target = block.paragraph.target;
+        block.original ??= [...target.childNodes];
+        const rendered = renderTranslation(block.paragraph, text);
+        block.result = text;
+        block.shown = rendered.text;
+        target.replaceChildren(rendered.nodes);
         block.element.setAttribute("data-plamonic-translated", state);
       });
     }
@@ -270,11 +299,12 @@ class PageTranslation implements FeatureInstance {
   private restore(block: Block) {
     if (!block.original || !block.element.isConnected) return;
     // Only where our translation is still what the element shows: elsewhere the site has replaced it.
-    if (normalizeText(block.element.textContent ?? "") === this.expectedText(block)) {
-      block.element.replaceChildren(...block.original);
+    if (!this.isStale(block)) {
+      block.paragraph.target.replaceChildren(...block.original);
     }
     block.element.removeAttribute("data-plamonic-translated");
     block.original = undefined;
+    block.result = undefined;
     block.shown = undefined;
   }
 

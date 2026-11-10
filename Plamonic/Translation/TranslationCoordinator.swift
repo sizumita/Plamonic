@@ -1133,6 +1133,9 @@ extension TranslationCoordinator {
     struct ExternalItem: Equatable, Sendable {
         var id: String
         var text: String
+        /// What the model gets, when it differs from `text` (a page's paragraph with its links marked). The
+        /// filters judge `text`.
+        var input: String? = nil
     }
 
     struct ExternalResult: Equatable, Sendable {
@@ -1157,6 +1160,7 @@ extension TranslationCoordinator {
     fileprivate struct ExternalEntry {
         var id: String
         var original: String
+        var input: String?
         /// nil = skipped.
         var subject: TranslationSubject?
         var glossary: [GlossaryTerm]
@@ -1211,7 +1215,7 @@ extension TranslationCoordinator {
         if let items {
             let previous = documents[key]
             if let previous, previous.settings == settings, previous.entries.map(\.original) == items.map(\.text),
-                previous.entries.map(\.id) == items.map(\.id)
+                previous.entries.map(\.input) == items.map(\.input), previous.entries.map(\.id) == items.map(\.id)
             {
                 document = previous
             } else {
@@ -1279,9 +1283,15 @@ extension TranslationCoordinator {
         var subjects = Set<TranslationSubject>()
         for item in items where indexByID[item.id] == nil {
             let normalized = TextSanitizer.normalize(item.text, maxLength: configuration.manualTextCharacterLimit)
-            var entry = ExternalEntry(id: item.id, original: item.text, subject: nil, glossary: [])
+            var entry = ExternalEntry(id: item.id, original: item.text, input: item.input, subject: nil, glossary: [])
             if !normalized.isEmpty, accepts(normalized, settings: settings, regexes: [], kanaNearby: false) {
-                let (subject, terms) = makeSubject(normalized, settings: settings, sanitizedGlossary: glossary)
+                // The filters judge the text itself; the model gets it with the link markers.
+                let input = item.input.map {
+                    TextSanitizer.normalize($0, maxLength: configuration.manualTextCharacterLimit)
+                }
+                let (subject, terms) = makeSubject(
+                    input.flatMap { $0.isEmpty ? nil : $0 } ?? normalized, settings: settings,
+                    sanitizedGlossary: glossary)
                 entry.subject = subject
                 entry.glossary = terms
                 subjects.insert(subject)
@@ -1404,7 +1414,7 @@ extension TranslationCoordinator {
 
 extension TranslationCoordinator.ExternalDocument {
     fileprivate var items: [TranslationCoordinator.ExternalItem] {
-        entries.map { TranslationCoordinator.ExternalItem(id: $0.id, text: $0.original) }
+        entries.map { TranslationCoordinator.ExternalItem(id: $0.id, text: $0.original, input: $0.input) }
     }
 }
 

@@ -132,10 +132,14 @@ final class BridgeService {
             site: site(of: request))
         // A text over the limit is skipped (left as it is), not cut: the page would show the translation of its
         // beginning in place of all of it.
+        // The marked input is longer than the text by its markers; past twice the limit it goes unmarked.
         let items = request.items.map { items in
             items.map {
-                TranslationCoordinator.ExternalItem(
-                    id: $0.id, text: $0.text.count > BridgeProtocol.maxItemCharacters ? "" : $0.text)
+                $0.text.count > BridgeProtocol.maxItemCharacters
+                    ? TranslationCoordinator.ExternalItem(id: $0.id, text: "")
+                    : TranslationCoordinator.ExternalItem(
+                        id: $0.id, text: $0.text,
+                        input: $0.input.flatMap { $0.count > 2 * BridgeProtocol.maxItemCharacters ? nil : $0 })
             }
         }
         let urgent = min(max(request.urgent ?? BridgeProtocol.defaultUrgentCount, 0), BridgeProtocol.maxUrgentCount)

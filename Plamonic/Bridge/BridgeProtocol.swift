@@ -66,6 +66,9 @@ struct BridgeRequest: Decodable, Equatable, Sendable {
     struct Item: Decodable, Equatable, Sendable {
         var id: String
         var text: String
+        /// What the model gets when it differs from `text`: a page's paragraph with its links and formatting
+        /// marked as `[text](n)`. The filters judge `text` (markers must not make a text look like code).
+        var input: String?
     }
 
     var id: BridgeMessageID?

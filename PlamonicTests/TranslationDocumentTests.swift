@@ -175,6 +175,24 @@ final class TranslationDocumentTests: XCTestCase {
     }
 
     @MainActor
+    func testAPagesMarkedTextIsJudgedByItsPlainTextAndSentWithItsMarkers() async throws {
+        let backend = TranslationFakeBackend()
+        let coordinator = F.coordinator(backend)
+        let settings = BridgeService.documentSettings(
+            global: F.settings(draft: nil).global, kind: "page", context: "", sourceLanguage: nil)
+        let marked = "[Yes](1) or [No](2)?"
+        // The markers alone would make the code filter skip it.
+        XCTAssertNotNil(TranslationTextFilter.rejection(for: marked, minLength: settings.minTextLength, ignorePatterns: []))
+        let page = Key(client: "chrome", id: "page:formatted")
+        coordinator.updateDocument(
+            page, items: [Item(id: "p0", text: "Yes or No?", input: marked)], focus: nil, urgentCount: 1,
+            settings: settings)
+        let ready = await F.waitUntil { coordinator.documentResults(page)?.first?.state == .final }
+        XCTAssertTrue(ready)
+        XCTAssertEqual(backend.calls.map(\.request.text), [marked])
+    }
+
+    @MainActor
     func testTheSourceLanguageAndContextReachTheModel() async throws {
         let backend = TranslationFakeBackend()
         let coordinator = F.coordinator(backend)

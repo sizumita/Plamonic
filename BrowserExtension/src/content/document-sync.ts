@@ -8,7 +8,10 @@ import type { FeatureContext } from "./feature";
  */
 export interface SyncItem {
   id: string;
+  /** What the app's filters judge (skipped, already in the target language). */
   text: string;
+  /** What the model gets, when it differs from `text`: the text with its links and formatting marked. */
+  input?: string;
 }
 
 export interface SyncOptions {
@@ -35,6 +38,47 @@ export type SyncStatus =
   | { state: "unreachable"; message: string }
   | { state: "disabled"; message: string }
   | { state: "error"; message: string };
+
+/**
+ * The texts of one request stay below this many bytes of UTF-8 (the app takes request lines up to 8 MiB; the rest
+ * is for JSON and the other fields).
+ */
+export const MAX_ITEMS_BYTES = 6 * 1024 * 1024;
+
+/**
+ * Keeps a request within MAX_ITEMS_BYTES: every text goes, and the marked inputs (twice the text, near enough)
+ * only as long as they fit, in order. A text sent without its input is translated without its formatting.
+ */
+export function fitInputs(items: SyncItem[], budget = MAX_ITEMS_BYTES): SyncItem[] {
+  let left = budget;
+  for (const item of items) left -= utf8Length(item.id) + utf8Length(item.text);
+  let fitting = true;
+  return items.map((item) => {
+    if (item.input === undefined) return item;
+    const size = utf8Length(item.input);
+    if (fitting && size <= left) {
+      left -= size;
+      return item;
+    }
+    // Later ones would fit only out of order; the first that does not fit ends the marked part.
+    fitting = false;
+    return { id: item.id, text: item.text };
+  });
+}
+
+function utf8Length(text: string): number {
+  let length = 0;
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index);
+    if (code < 0x80) length += 1;
+    else if (code < 0x800) length += 2;
+    else if (code >= 0xd800 && code < 0xdc00) {
+      length += 4;
+      index++;
+    } else length += 3;
+  }
+  return length;
+}
 
 /** Texts after the focus whose results are asked for in every poll. */
 const LOOKAHEAD = 60;
@@ -63,7 +107,7 @@ export class DocumentSync {
     private readonly context: FeatureContext,
     options: SyncOptions,
   ) {
-    this.options = { ...options };
+    this.options = { ...options, items: fitInputs(options.items) };
     this.documentId = `${options.document.slice(0, 490)}#${instanceSuffix()}`;
     options.items.forEach((item, position) => this.index.set(item.id, position));
   }
@@ -92,6 +136,7 @@ export class DocumentSync {
 
   /** Replaces the texts (a page that grew). They are sent again with the next request; known results stay. */
   setItems(items: SyncItem[]) {
+    items = fitInputs(items);
     this.options.items = items;
     this.index.clear();
     items.forEach((item, position) => this.index.set(item.id, position));
