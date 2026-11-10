@@ -837,6 +837,12 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
   （Chrome、Chrome Beta / Dev / Canary、Chromium、Edge、Brave、Arc、Vivaldi）の `NativeMessagingHosts` に書く
   （`ChromeNativeHostInstaller`）。中身が同じなら書かない。アプリを動かしても次の起動で直る。使える拡張機能は
   `allowed_origins` に載せた ID だけ（開発用ビルドの ID。Chrome Web Store に出したらその ID を足す）。
+- Chrome の拡張機能は、リリースだけを Chrome Web Store に出す（タグのリリースが審査に出す。DEVELOPMENT の
+  「Chrome Web Store」）。ベータ版はストアに出さない。アプリは自分と同じバージョンの拡張機能を
+  `Contents/Resources/ChromeExtension` に同梱し（`BrowserExtension/dist/chrome-unpacked`。開発用ビルドと同じ鍵なので
+  同じ ID になる）、ベータ版のビルドは設定の「ブラウザ」にそのフォルダを Finder で示すボタンを出す。使う人は
+  `chrome://extensions` のデベロッパー モードで読み込む。アプリの中のフォルダを読み込むので、アプリを更新すると
+  拡張機能も同じバージョンになる（Chrome が読み直すのは、開き直したときか、再読み込みしたとき）。
 - 権限 0600 で、つなげてきたプロセスの uid が同じときだけ受ける。1 つの接続で何行送ってもよく、最後の行は改行が
   なくても（送り側が書き込みを閉じれば）答える。1 行は 8 MB まで。60 秒何も来ない接続は切る。
 - 実際のブラウザで確かめたことと、ブラウザやサイトごとに気をつけることは [BROWSER_EXTENSION_NOTES.md](BROWSER_EXTENSION_NOTES.md)。

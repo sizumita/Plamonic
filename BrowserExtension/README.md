@@ -19,7 +19,7 @@ Safari と Chrome で同じコードを使う Plamonic の拡張機能（Manifes
 
 ```bash
 npm install
-npm run build        # dist/chrome と dist/safari
+npm run build        # dist/chrome（ストア用）、dist/chrome-unpacked（アプリに同梱）、dist/safari
 npm run build:dev    # 開発用（ソースマップつき、検証用の Native Messaging ホストと拡張機能 ID を使う）
 npm test             # 字幕の読み取り、文のまとめ方、トラックの選び方、アプリとの同期、ページ翻訳の印の付け外し、投稿の言語の判定
 npm run typecheck
@@ -27,6 +27,9 @@ npm run typecheck
 
 - Chrome: `chrome://extensions` のデベロッパーモードで `dist/chrome`（`npm run build:dev`）を読み込む。Plamonic を起動しておけば、
   アプリが Chrome に Native Messaging ホスト（アプリ内の `Contents/Helpers/plamonic-chrome-host`）を登録している。
+- ベータ版のアプリを使う人は、アプリに入っている拡張機能を読み込む（設定 >「一般」>「ブラウザ」の「ベータ版の Chrome
+  拡張機能」）。Plamonic のビルドが `dist/chrome-unpacked` を `Contents/Resources/ChromeExtension` に入れる。
+  リリースは Chrome ウェブストアに出す（docs/DEVELOPMENT.md の「Chrome Web Store」）。
 - Safari: Plamonic のビルドが `dist/safari` を `PlamonicSafariExtension.appex` に入れる（`scripts/build-web-extension.sh`）。
   隠しフォルダ（`.claude/` など）の中のアプリの拡張機能は Safari に出ないので、`~/Applications` に置いて起動する。
 

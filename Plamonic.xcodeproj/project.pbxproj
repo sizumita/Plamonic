@@ -800,6 +800,7 @@
 			buildConfigurationList = F8630E5D1F7A383FF3EB0F8E /* Build configuration list for PBXNativeTarget "Plamonic" */;
 			buildPhases = (
 				B03CDC8B604ECBA9A1CDD5BB /* Sources */,
+				C0821AAA0BBC7EE3AB26CE49 /* Copy the Chrome extension */,
 				6DA902DFD9FB99E6CE0FAE09 /* Resources */,
 				9FE504510DAF46900CE1B96F /* Frameworks */,
 				D282593C1F3E265323EDC76B /* Embed Foundation Extensions */,
@@ -906,7 +907,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "scripts/build-web-extension.sh \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"";
+			shellScript = "scripts/build-web-extension.sh safari \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"";
+		};
+		C0821AAA0BBC7EE3AB26CE49 /* Copy the Chrome extension */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy the Chrome extension";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChromeExtension/manifest.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "scripts/build-web-extension.sh chrome \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ChromeExtension\"";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1123,6 +1144,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Plamonic/Resources/Plamonic.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Plamonic/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1291,6 +1313,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Plamonic/Resources/Plamonic.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Plamonic/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

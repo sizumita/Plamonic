@@ -1,12 +1,17 @@
 // Builds the extension for both browsers from the same sources:
 //
-//   dist/chrome/  load unpacked in Chrome (chrome://extensions)
-//   dist/safari/  copied into the Safari web extension (.appex) by the Xcode build
+//   dist/chrome/           what the Chrome Web Store gets; with --dev, load it unpacked in Chrome (chrome://extensions)
+//   dist/chrome-unpacked/  dist/chrome with the fixed key: copied into the app (Contents/Resources/ChromeExtension)
+//                          by the Xcode build, for a beta's users to load unpacked
+//   dist/safari/           copied into the Safari web extension (.appex) by the Xcode build
 //
-// Usage: node scripts/build.mjs [--dev] [--watch]
-//   --dev    adds sourcemaps and gives the Chrome build a fixed key, so it gets the extension ID that Plamonic's
-//            native host allows (ChromeNativeHostInstaller.extensionIDs).
-//   --watch  rebuilds on change.
+// Usage: node scripts/build.mjs [--dev] [--watch] [--version=X.Y.Z[-PRERELEASE]]
+//   --dev      adds sourcemaps and gives dist/chrome the fixed key too, so it gets the extension ID that Plamonic's
+//              native host allows (ChromeNativeHostInstaller.extensionIDs).
+//   --watch    rebuilds on change.
+//   --version  the version to build, instead of package.json's: the release workflow passes the app's. A manifest's
+//              version is numbers only, so a prerelease (0.2.0-beta.3) builds as 0.2.0, with the whole version as
+//              Chrome's version_name.
 import * as esbuild from "esbuild";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -17,8 +22,16 @@ const args = new Set(process.argv.slice(2));
 const dev = args.has("--dev");
 const watch = args.has("--watch");
 const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+const version = [...args].find((arg) => arg.startsWith("--version="))?.slice("--version=".length) ?? pkg.version;
+// Chrome takes one to four numbers up to 65535; Plamonic's versions have three.
+const numbers = /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/.exec(version)?.slice(1, 4);
+if (!numbers || numbers.some((number) => Number(number) > 65535 || String(Number(number)) !== number)) {
+  console.error(`build.mjs: the version must be X.Y.Z or X.Y.Z-PRERELEASE, with numbers up to 65535, not '${version}'`);
+  process.exit(1);
+}
+const manifestVersion = numbers.join(".");
 
-/** Gives the dev build the extension ID bdoanndchiakcnoejbbjabpenbgbkfcb, which Plamonic's native host allows. */
+/** Gives an unpacked build the extension ID bdoanndchiakcnoejbbjabpenbgbkfcb, which Plamonic's native host allows. */
 const DEV_KEY =
   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0EogWWDRTAWsRWbtbWPDgPiGtcU0bS1F11g8EnI4p/IBR+hfz5xNwIjx46XYt9vaUcC3Y7fGtgaOVEJEd2wfeo+6iqFc8g2U9m+S0BDNN5KCBKGWPUWaWlsLl81GuwPpRf8EZp/T0X0Ron0bBJPr+1d495+Br8y3Usq8RMkdZJaO63ofNACM6XhoFHfVwF6cg3B5E6GlZKZWK0GSAuMW5th3iNKKp7HC7Xalzn/HmmtuEXyUaCOLICkdTvLp4pmm+bcZetWwY2NhgU5HAb7vhGPekhZwoL4ZI8VMgB1zrTvWTTPfYhJz5jK+YkQrDzZ/eZhrYUzGY7z5AwD6VbcYsQIDAQAB";
 /** Plamonic's native host (Contents/Helpers/plamonic-chrome-host, registered by the app at launch). */
@@ -31,12 +44,19 @@ const POST_MATCHES = ["https://www.youtube.com/*", "https://x.com/*", "https://p
 /** Sites the content script runs on by itself. A feature for a new site adds its pattern (and itself to features/index.ts). */
 const CONTENT_MATCHES = [...new Set([...YOUTUBE_MATCHES, ...POST_MATCHES])];
 
-function manifest(browser) {
+/** What is built: the folder in dist/, its browser, and whether its manifest has the fixed key. */
+const TARGETS = [
+  { name: "chrome", browser: "chrome", key: dev },
+  { name: "chrome-unpacked", browser: "chrome", key: true },
+  { name: "safari", browser: "safari", key: false },
+];
+
+function manifest({ browser, key }) {
   const icons = { 16: "icons/16.png", 32: "icons/32.png", 48: "icons/48.png", 128: "icons/128.png" };
   const base = {
     manifest_version: 3,
     name: "Plamonic",
-    version: pkg.version,
+    version: manifestVersion,
     description: "Web ページを、この Mac の Plamonic で翻訳します。翻訳は Mac の中で行い、文章を外に送りません。",
     icons,
     action: { default_title: "Plamonic", default_icon: icons, default_popup: "popup.html" },
@@ -62,13 +82,15 @@ function manifest(browser) {
     });
     base.permissions.push("sidePanel");
     base.side_panel = { default_path: "sidebar.html" };
-    if (dev) base.key = DEV_KEY;
+    if (version !== manifestVersion) base.version_name = version;
+    if (key) base.key = DEV_KEY;
   }
   return base;
 }
 
-async function build(browser) {
-  const out = join(root, "dist", browser);
+async function build(target) {
+  const { name, browser } = target;
+  const out = join(root, "dist", name);
   await rm(out, { recursive: true, force: true });
   await mkdir(out, { recursive: true });
   const options = {
@@ -89,19 +111,19 @@ async function build(browser) {
     define: {
       __BROWSER__: JSON.stringify(browser),
       __NATIVE_HOST__: JSON.stringify(NATIVE_HOST),
-      __VERSION__: JSON.stringify(pkg.version),
+      __VERSION__: JSON.stringify(version),
     },
     logLevel: "warning",
   };
   await cp(join(root, "static"), out, { recursive: true });
-  await writeFile(join(out, "manifest.json"), JSON.stringify(manifest(browser), null, 2) + "\n");
+  await writeFile(join(out, "manifest.json"), JSON.stringify(manifest(target), null, 2) + "\n");
   if (watch) {
     const context = await esbuild.context(options);
     await context.watch();
   } else {
     await esbuild.build(options);
   }
-  console.log(`built dist/${browser}${dev ? " (dev)" : ""}`);
+  console.log(`built dist/${name}${dev ? " (dev)" : ""}`);
 }
 
-await Promise.all([build("chrome"), build("safari")]);
+await Promise.all(TARGETS.map(build));

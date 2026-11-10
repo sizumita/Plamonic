@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests the release scripts (version.sh and appcast.sh) in a throwaway repository. Needs git and xmllint.
+# Tests the release scripts (version.sh, appcast.sh and chrome-web-store.sh) in a throwaway repository, the last
+# against a stand-in for curl. Needs git, xmllint, jq, openssl, zip and unzip.
 #
 #   scripts/test.sh
 set -euo pipefail
@@ -117,6 +118,111 @@ check "a build that is not a number" refused "$("$appcast" build odd-build.xml b
 "$appcast" feed 'Plamonic <"&">' odd.xml >odd-feed.xml
 check "titles are escaped" 'Plamonic <"&">' "$(xpath 'string(/rss/channel/title)' odd-feed.xml)"
 check "urls are escaped" 'https://example.com/a.zip?a=1&b="<x>"' "$(xpath 'string(//enclosure/@url)' odd-feed.xml)"
+
+# chrome-web-store.sh, with a curl that answers from the files of $STORE and lists what was asked in $STORE/calls.
+export STORE="$work/store"
+mkdir -p "$STORE" "$work/bin" "$work/package"
+cat >"$work/bin/curl" <<'CURL'
+#!/usr/bin/env bash
+out="" url=""
+while (($#)); do
+  case "$1" in
+  -o) out="$2" && shift 2 ;;
+  -w | -X | -H | -T | --data | --config) shift 2 ;;
+  -*) shift ;;
+  *) url="$1" && shift ;;
+  esac
+done
+cat >/dev/null
+name="${url##*[:/]}"
+echo "$name" >>"$STORE/calls"
+if [[ -f "$STORE/$name" ]]; then
+  cat "$STORE/$name" >"$out"
+  printf 200
+else
+  echo '{"error": "refused"}' >"$out"
+  printf 403
+fi
+CURL
+chmod +x "$work/bin/curl"
+
+openssl genrsa -out "$work/key.pem" 2048 2>/dev/null
+account="$(jq -n --rawfile key "$work/key.pem" '{client_email: "store@example.invalid", private_key: $key}')"
+pack() { # pack NAME MANIFEST
+  echo "$2" >"$work/package/manifest.json"
+  rm -f "$work/$1.zip"
+  (cd "$work/package" && zip -q "$work/$1.zip" manifest.json)
+}
+pack release '{"version": "0.2.0"}'
+pack development '{"version": "0.2.0", "key": "MIIB"}'
+pack beta '{"version": "0.2.0", "version_name": "0.2.0-beta.3"}'
+
+# revisions PUBLISHED [SUBMITTED STATE]: the store's status.
+revisions() {
+  jq -n --arg published "$1" --arg submitted "${2:-}" --arg state "${3:-}" '
+    def revision(version; state): {state: state, distributionChannels: [{deployPercentage: 100, crxVersion: version}]};
+    (if $published == "" then {} else {publishedItemRevisionStatus: revision($published; "PUBLISHED")} end) +
+    (if $submitted == "" then {} else {submittedItemRevisionStatus: revision($submitted; $state)} end)' \
+    >"$STORE/fetchStatus"
+}
+# What the script asked the store for, then "refused" if it failed.
+submit() { # submit [PACKAGE [VERSION]]
+  : >"$STORE/calls"
+  local result=""
+  PATH="$work/bin:$PATH" CHROME_WEB_STORE_PUBLISHER=publisher CHROME_WEB_STORE_ITEM=abcdefghijklmnopabcdefghijklmnop \
+    CHROME_WEB_STORE_SERVICE_ACCOUNT="$account" CHROME_WEB_STORE_POLL_SECONDS=0 \
+    "$root/scripts/chrome-web-store.sh" "$work/${1:-release}.zip" "${2:-0.2.0}" >/dev/null 2>&1 || result=refused
+  echo "$(tr '\n' ' ' <"$STORE/calls")$result"
+}
+
+echo '{"access_token": "token", "expires_in": 3600}' >"$STORE/token"
+echo '{"uploadState": "SUCCEEDED", "crxVersion": "0.2.0"}' >"$STORE/upload"
+echo '{"state": "PENDING_REVIEW"}' >"$STORE/publish"
+echo '{}' >"$STORE/cancelSubmission"
+
+revisions 0.1.0
+check "a newer release is sent" "token fetchStatus upload publish " "$(submit)"
+revisions ""
+check "an item not published yet" "token fetchStatus upload publish " "$(submit)"
+revisions 0.2.0
+check "the published version is not sent again" "token fetchStatus " "$(submit)"
+revisions 0.1.0 0.2.0 PENDING_REVIEW
+check "the version in review is not sent again" "token fetchStatus " "$(submit)"
+revisions 0.10.0
+check "the store is never taken back" "token fetchStatus " "$(submit)"
+revisions 0.1.0 0.3.0 PENDING_REVIEW
+check "nor past a newer version in review" "token fetchStatus " "$(submit)"
+revisions 0.1.0 0.1.5 PENDING_REVIEW
+check "an older version in review is withdrawn" "token fetchStatus cancelSubmission upload publish " "$(submit)"
+revisions 0.1.0 0.2.0 REJECTED
+check "a rejected version is sent again" "token fetchStatus upload publish " "$(submit)"
+revisions 0.1.0 0.2.0 CANCELLED
+check "a withdrawn version is sent again" "token fetchStatus upload publish " "$(submit)"
+
+revisions 0.1.0
+jq '. + {lastAsyncUploadState: "SUCCEEDED"}' "$STORE/fetchStatus" >"$STORE/status" && mv "$STORE/status" "$STORE/fetchStatus"
+echo '{"uploadState": "IN_PROGRESS"}' >"$STORE/upload"
+check "an upload the store is still working on" "token fetchStatus upload fetchStatus publish " "$(submit)"
+echo '{"uploadState": "FAILED"}' >"$STORE/upload"
+check "a failed upload" "token fetchStatus upload refused" "$(submit)"
+echo '{"uploadState": "SUCCEEDED", "crxVersion": "0.2.0"}' >"$STORE/upload"
+echo '{"state": "REJECTED"}' >"$STORE/publish"
+check "a submission the store does not take" "token fetchStatus upload publish refused" "$(submit)"
+rm "$STORE/publish"
+check "a call the store refuses" "token fetchStatus upload publish refused" "$(submit)"
+echo '{"state": "PENDING_REVIEW"}' >"$STORE/publish"
+jq '. + {takenDown: true}' "$STORE/fetchStatus" >"$STORE/status" && mv "$STORE/status" "$STORE/fetchStatus"
+check "an item taken down" "token fetchStatus refused" "$(submit)"
+revisions 0.1.0
+echo '{"error": "invalid_grant"}' >"$STORE/token"
+check "no access token" "token refused" "$(submit)"
+echo '{"access_token": "token", "expires_in": 3600}' >"$STORE/token"
+
+check "a package of another version" refused "$(submit release 0.3.0)"
+check "a development build" refused "$(submit development)"
+check "a beta" refused "$(submit beta 0.2.0-beta.3)"
+account='{"type": "authorized_user"}'
+check "a key that is not a service account's" refused "$(submit)"
 
 if ((failures)); then
   echo "$failures failed"
