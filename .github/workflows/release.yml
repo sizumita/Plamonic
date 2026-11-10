@@ -540,10 +540,17 @@ jobs:
 
   # The store reviews the submission and then publishes it by itself. A run for a version that the store already has,
   # or has passed, sends nothing, so a release can be built again.
+  #
+  # One at a time for all tags, and never cancelled once started: the script reads the store's state and then
+  # withdraws, uploads and submits, so two releases at once (the workflow's own group is per tag) could otherwise
+  # withdraw each other's submission. The second one then finds what the first one sent.
   store:
     name: Submit to the Chrome Web Store
     needs: [version, build, publish]
     if: github.ref_type == 'tag' && vars.CHROME_WEB_STORE_ITEM != ''
+    concurrency:
+      group: chrome-web-store
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
