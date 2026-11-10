@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Puts the web extension (BrowserExtension/, built to dist/safari) into the Safari extension being built. Xcode runs
-# it as a build phase of PlamonicSafariExtension.
+# Puts the web extension (BrowserExtension/) into what Xcode is building, as a build phase:
 #
-#   scripts/build-web-extension.sh DESTINATION
+#   scripts/build-web-extension.sh safari DESTINATION   dist/safari, into PlamonicSafariExtension.appex's Resources
+#   scripts/build-web-extension.sh chrome DESTINATION   dist/chrome-unpacked, into the app's Resources/ChromeExtension,
+#                                                       which a beta offers to load unpacked in Chrome (DESIGN §9.1)
 #
-# CI and releases build the web extension first (npm ci && npm run build). On a Mac, when dist/safari is missing or
-# older than the sources, this builds it with Node if Node and BrowserExtension/node_modules are there, and fails
+# CI and releases build the web extension first (npm ci && npm run build). On a Mac, when the built files are missing
+# or older than the sources, this builds them with Node if Node and BrowserExtension/node_modules are there, and fails
 # otherwise rather than ship stale files.
 set -euo pipefail
 
@@ -14,11 +15,22 @@ fail() {
   exit 1
 }
 
-(($# == 1)) || fail "usage: scripts/build-web-extension.sh DESTINATION"
-destination="$1"
+(($# == 2)) || fail "usage: scripts/build-web-extension.sh safari|chrome DESTINATION"
+destination="$2"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 web="${root}/BrowserExtension"
-built="${web}/dist/safari"
+# Only ever into these folders: --delete removes files the web extension no longer has.
+case "$1" in
+safari)
+  built="${web}/dist/safari"
+  [[ "${destination}" == *.appex/Contents/Resources ]] || fail "unexpected destination ${destination}"
+  ;;
+chrome)
+  built="${web}/dist/chrome-unpacked"
+  [[ "${destination}" == *.app/Contents/Resources/ChromeExtension ]] || fail "unexpected destination ${destination}"
+  ;;
+*) fail "usage: scripts/build-web-extension.sh safari|chrome DESTINATION" ;;
+esac
 
 # The newest source file, compared with the built manifest.
 stale() {
@@ -41,14 +53,12 @@ find_node() {
 }
 
 if stale; then
-  node="$(find_node)" || fail "BrowserExtension/dist/safari is missing or out of date, and Node was not found. Run: cd BrowserExtension && npm ci && npm run build"
+  node="$(find_node)" || fail "BrowserExtension/dist/${built##*/} is missing or out of date, and Node was not found. Run: cd BrowserExtension && npm ci && npm run build"
   [[ -d "${web}/node_modules" ]] || fail "BrowserExtension/node_modules is missing. Run: cd BrowserExtension && npm ci"
   echo "Building the web extension with ${node}"
   (cd "${web}" && "${node}" scripts/build.mjs)
 fi
 
-# Only ever into a Safari extension's Resources: --delete removes files the web extension no longer has.
-[[ "${destination}" == *.appex/Contents/Resources ]] || fail "unexpected destination ${destination}"
 mkdir -p "${destination}"
 rsync -a --delete "${built}/" "${destination}/"
 echo "Copied the web extension into ${destination}"

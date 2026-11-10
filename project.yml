@@ -57,6 +57,13 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+    # Contents/Resources/ChromeExtension: the Chrome extension to load unpacked, which a beta offers in its settings.
+    postCompileScripts:
+      - name: Copy the Chrome extension
+        script: scripts/build-web-extension.sh chrome "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ChromeExtension"
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ChromeExtension/manifest.json
     info:
       path: Plamonic/Resources/Info.plist
       properties:
@@ -85,6 +92,8 @@ targets:
         PRODUCT_NAME: Plamonic
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # The build phase reads BrowserExtension/ and may run Node there.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
   # Safari's half of the browser extension: the web extension (BrowserExtension/, copied in by the build phase) and
   # the native handler that forwards its messages to the app's bridge socket.
   PlamonicSafariExtension:
@@ -99,7 +108,7 @@ targets:
       - Plamonic/Bridge/BridgeLocation.swift
     postCompileScripts:
       - name: Copy the web extension
-        script: scripts/build-web-extension.sh "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+        script: scripts/build-web-extension.sh safari "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
         basedOnDependencyAnalysis: false
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/manifest.json

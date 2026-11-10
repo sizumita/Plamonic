@@ -64,6 +64,18 @@ final class ChromeNativeHostTests: XCTestCase {
         XCTAssertEqual(ChromeNativeHostInstaller.installedBrowsers(appBundle: moved, home: home), ["Google Chrome", "Brave"])
     }
 
+    func testTheBundledExtensionIsFoundByItsManifest() throws {
+        let app = FileManager.default.temporaryDirectory.appending(path: "plamonic-app-\(UUID().uuidString)/Plamonic.app")
+        defer { try? FileManager.default.removeItem(at: app.deletingLastPathComponent()) }
+        XCTAssertNil(ChromeNativeHostInstaller.bundledExtension(appBundle: app))
+
+        let folder = app.appending(path: "Contents/Resources/ChromeExtension")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        XCTAssertNil(ChromeNativeHostInstaller.bundledExtension(appBundle: app))
+        try Data("{}".utf8).write(to: folder.appending(path: "manifest.json"))
+        XCTAssertEqual(ChromeNativeHostInstaller.bundledExtension(appBundle: app), folder)
+    }
+
     func testTheHostLooksInTheGroupContainerFirst() {
         let home = URL(fileURLWithPath: "/Users/someone")
         XCTAssertEqual(

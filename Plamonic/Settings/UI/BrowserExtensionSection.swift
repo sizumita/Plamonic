@@ -7,6 +7,8 @@ struct BrowserExtensionSection: View {
     @State private var safariEnabled: Bool?
     @State private var safariError: String?
     @State private var chromeBrowsers: [String] = []
+    /// A beta carries its own Chrome extension, to load unpacked: the store has releases only.
+    private let betaChromeExtension = BuildInfo.main.isBeta ? ChromeNativeHostInstaller.bundledExtension() : nil
 
     static let safariExtensionID = "io.smdr.Plamonic.SafariExtension"
 
@@ -35,11 +37,19 @@ struct BrowserExtensionSection: View {
                         .lineLimit(2)
                 }
             }
+            if let betaChromeExtension {
+                LabeledContent("ベータ版の Chrome 拡張機能") {
+                    Button("フォルダを表示") { NSWorkspace.shared.activateFileViewerSelecting([betaChromeExtension]) }
+                }
+            }
         } header: {
             Text("ブラウザ")
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Safari と Chrome の Plamonic 拡張機能が、Web ページをこの Mac で翻訳できるようにします。Safari では「設定」の「機能拡張」で Plamonic をオンにしてください。Chrome、Edge、Brave などには、Plamonic が起動したときに拡張機能との接続を登録します（拡張機能はそれぞれのストアから入れます）。")
+                if betaChromeExtension != nil {
+                    Text("このベータ版には、同じバージョンの Chrome 拡張機能が入っています。Chrome で chrome://extensions を開いて「デベロッパー モード」をオンにし、「フォルダを表示」で選ばれたフォルダをそのページにドラッグすると入ります。Plamonic を更新したあとは、Chrome を開き直すと拡張機能も新しくなります。")
+                }
                 if let safariError { Text(safariError).foregroundStyle(.orange) }
             }
         }

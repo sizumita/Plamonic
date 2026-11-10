@@ -82,7 +82,7 @@ Safari と Chrome では、Plamonic の拡張機能も使えます。翻訳は�
 - **サイトごとの設定**: 「設定」>「Webサイト」で、サイトごとに「自動」「手動」「オフ」と、訳す場所（CSS セレクタ）を決められます。「自動」にしたサイトは開くだけで訳されます。YouTube、X、Reddit、GitHub、Wikipedia、Hacker News にはプリセットがあります。
 
 Safari の拡張機能は Plamonic に入っています。Plamonic を一度起動してから、Safari の「設定」>「機能拡張」で Plamonic をオンにしてください。
-Chrome の拡張機能は Chrome ウェブストアで公開する予定です。それまでは[ソースからビルドして](BrowserExtension/README.md)読み込めます。
+Chrome の拡張機能は Chrome ウェブストアで公開する予定です。それまでは[ソースからビルドして](BrowserExtension/README.md)読み込めます。ベータ版の Plamonic には同じバージョンの拡張機能が入っていて、「設定」>「一般」>「ブラウザ」から読み込めます。
 詳しくは[使い方](docs/USAGE.ja.md#ブラウザの拡張機能)を見てください。
 
 ## はじめかた

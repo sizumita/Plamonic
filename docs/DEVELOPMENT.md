@@ -34,7 +34,8 @@ A build from source has the bundle ID of the release (`io.smdr.Plamonic`) and us
 itself ([Updates](#updates)).
 
 The Safari extension's build phase (`scripts/build-web-extension.sh`) copies `BrowserExtension/dist/safari` into
-`Contents/PlugIns/PlamonicSafariExtension.appex`. When the web extension's sources are newer than that build, it
+`Contents/PlugIns/PlamonicSafariExtension.appex`, and the app's copies `dist/chrome-unpacked` into
+`Contents/Resources/ChromeExtension`. When the web extension's sources are newer than that build, it
 rebuilds it with Node (found on the usual paths, since Xcode runs build phases with a minimal `PATH`), or fails and
 says to run `npm run build`. [BrowserExtension/README.md](../BrowserExtension/README.md) explains the extension.
 
@@ -52,7 +53,9 @@ says to run `npm run build`. [BrowserExtension/README.md](../BrowserExtension/RE
   through the native messaging host inside it (`Contents/Helpers/plamonic-chrome-host`), which Plamonic registers with
   the installed browsers when it starts (`~/Library/Application Support/<browser>/NativeMessagingHosts/io.smdr.plamonic.json`).
   The manifest names the app it was written by, so after trying a build from another folder, start the app you
-  mean to use again.
+  mean to use again. Every build of the app also carries the extension with that key, its own version, in
+  `Contents/Resources/ChromeExtension` (`dist/chrome-unpacked`). A beta shows that folder in its settings
+  (一般 › ブラウザ › ベータ版の Chrome 拡張機能) for its users to load unpacked: the store has releases only.
 
 ### Signing local builds
 
@@ -213,6 +216,7 @@ Actions tab, on `main` or on a release tag, to build again.
 | Files              | `Plamonic-Beta.dmg`, `Plamonic-Beta.zip`, `appcast.xml`      | `Plamonic.dmg`, `Plamonic.zip`, `appcast.xml`               |
 | A file's link      | `https://github.com/sizumita/Plamonic/releases/download/beta/` | `https://github.com/sizumita/Plamonic/releases/latest/download/` |
 | Signing secrets in | the environment `beta`                                       | the environment `production`                                |
+| Chrome extension   | in the app, to load unpacked                                 | submitted to the Chrome Web Store                           |
 
 Betas and releases are the same app, `Plamonic.app` with the bundle ID `io.smdr.Plamonic`, so either replaces the other
 and keeps the settings, the models and the permissions. The DMG is for the first install, and the zip is the update
@@ -235,7 +239,8 @@ git push origin v0.1.0
 The workflow then builds, signs and notarizes the app, and publishes the release with notes that GitHub writes from the
 pull requests since the previous release. A tag on a commit that is not on `main` fails.
 
-The workflow has four jobs. `version` computes the version. `build` compiles the Release app without any secret,
+The workflow has four jobs for the app, and `store` for the Chrome Web Store ([below](#chrome-web-store)). `version`
+computes the version. `build` compiles the Release app without any secret,
 unsigned, with the version and the public update key. `sign` runs in the environment of its kind, signs and notarizes
 the app, makes the update archive and the disk image, verifies them, and writes the feed item. `publish` is the only job
 that may write to the repository: it uploads the files first and the feed last, so that a feed never names a file that
@@ -273,6 +278,43 @@ environment. Set them up once:
    ```
 
 A missing secret stops the job with an error that points here.
+
+### Chrome Web Store
+
+A release also sends the Chrome extension to the Chrome Web Store, as the app's version: after `publish`, the job
+`store` uploads `dist/chrome` (the build without the key) and submits it for review with
+[`scripts/chrome-web-store.sh`](../scripts/chrome-web-store.sh). The store publishes it by itself once the review
+passes, so the extension reaches its users later than the app does: the two must work together across versions. A
+beta is never sent. Its users load the extension that the beta app carries (see
+[Trying the browser extensions](#trying-the-browser-extensions)).
+
+The job never sends a version twice and never takes the store back: when the published version, or the one in review,
+is this release or a newer one, it does nothing, so a release can be built again. An older version still in review is
+withdrawn and replaced. A rejected version is sent again.
+
+The store's item is made by hand, once, and the job is skipped until the repository variable `CHROME_WEB_STORE_ITEM`
+names it:
+
+1. Register as a developer in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole) with a Google
+   account that has 2-step verification on. Build the package (`cd BrowserExtension && npm ci && npm run build --
+   --version=X.Y.Z`, then zip the contents of `dist/chrome`), upload it as a new item, and fill in the Store listing
+   and Privacy tabs.
+2. The item's ID is the extension's ID. Add it to `ChromeNativeHostInstaller.extensionIDs` and release the app, so
+   that the installed apps let the store's extension reach them, before the item is published.
+3. Publish the item from the dashboard the first time, with the visibility it should have. The API keeps that
+   visibility afterwards.
+4. In a Google Cloud project, enable the Chrome Web Store API and create a service account, with no role. Add its
+   email address in the Developer Dashboard (Account), which lets it manage the publisher's items; a publisher can
+   link one service account. Create a JSON key for it.
+5. The variables and the secret:
+
+   ```sh
+   gh variable set CHROME_WEB_STORE_PUBLISHER   # the publisher ID (Developer Dashboard › Account)
+   gh variable set CHROME_WEB_STORE_ITEM        # the item's ID
+   gh secret set CHROME_WEB_STORE_SERVICE_ACCOUNT --env production < service-account.json
+   ```
+
+With the item named but the publisher or the key missing, the job stops with an error that points here.
 
 ### Updates
 

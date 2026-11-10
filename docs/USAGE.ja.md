@@ -126,6 +126,7 @@ Safari と Chrome の Plamonic 拡張機能は、YouTube の字幕と Web ペー
 
 - **Safari**: 拡張機能は Plamonic に入っています。Plamonic を「アプリケーション」フォルダに置いて一度起動してから、Safari の「設定」>「機能拡張」で Plamonic をオンにしてください。Plamonic の「設定」>「一般」>「ブラウザ」の「Safari の設定を開く」からも開けます。
 - **Chrome（Edge、Brave など Chromium 系のブラウザ）**: Plamonic は起動するたびに、見つかったブラウザに拡張機能との接続（Native Messaging ホスト）を登録します。拡張機能は Chrome ウェブストアで公開する予定です。それまでは、[BrowserExtension/README.md](../BrowserExtension/README.md) のとおりにビルドして、`chrome://extensions` のデベロッパーモードで読み込んでください。
+  - **ベータ版の Plamonic を使っているとき**: ベータ版には同じバージョンの拡張機能が入っています。「設定」>「一般」>「ブラウザ」の「ベータ版の Chrome 拡張機能」で「フォルダを表示」を押し、Chrome で `chrome://extensions` を開いて「デベロッパー モード」をオンにしてから、Finder で選ばれたフォルダをそのページにドラッグしてください（「パッケージ化されていない拡張機能を読み込む」でそのフォルダを選んでも入ります）。Plamonic を更新したあとは、Chrome を開き直すと拡張機能も新しくなります。
 
 Plamonic の「設定」>「一般」>「ブラウザ」の「ブラウザの拡張機能に翻訳を提供する」がオフだと、拡張機能には訳を返しません（既定はオン）。
 

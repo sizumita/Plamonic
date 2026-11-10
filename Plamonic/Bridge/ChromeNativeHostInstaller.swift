@@ -11,6 +11,9 @@ enum ChromeNativeHostInstaller {
     /// Extensions allowed to use the host: the build from BrowserExtension/ (its manifest `key` fixes this ID).
     /// Add the Chrome Web Store's ID here when the extension is published there.
     static let extensionIDs = ["bdoanndchiakcnoejbbjabpenbgbkfcb"]
+    /// The extension to load unpacked in Chrome, which the build copies into the app from
+    /// BrowserExtension/dist/chrome-unpacked: the app's own version, with the key of the ID above.
+    static let extensionPath = "Contents/Resources/ChromeExtension"
 
     struct Browser: Equatable, Sendable {
         var name: String
@@ -65,6 +68,12 @@ enum ChromeNativeHostInstaller {
             }
         }
         return installed
+    }
+
+    /// The folder of the extension inside the app, if the build put one there.
+    static func bundledExtension(appBundle: URL = Bundle.main.bundleURL) -> URL? {
+        let folder = appBundle.appending(path: extensionPath)
+        return FileManager.default.fileExists(atPath: folder.appending(path: "manifest.json").path) ? folder : nil
     }
 
     /// The browsers whose manifest points at this app's host.
