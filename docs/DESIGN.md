@@ -912,3 +912,19 @@ Plamonic: BridgeSocketServer → BridgeService → TranslationCoordinator の「
   - 「このサイトだけ許可」: `sites` で自動のサイトを聞き、許可されたサイトだけに登録する。
   - 登録は `scripting.registerContentScripts`。YouTube の字幕の翻訳はサイトの動作とは別（オフでも字幕は訳す）。
 
+### 9.5 投稿の「PLaMoで翻訳」ボタン
+
+X（x.com、pro.x.com）の投稿と YouTube のコメントでは、サイト自身の翻訳ボタンの横に「PLaMoで翻訳」を出す（拡張機能が
+はじめから動くサイトは、manifest の `host_permissions` に載せた YouTube と X）。押した投稿だけを訳す。
+
+- 経路はページ翻訳と同じ `sync`。押された投稿を 1 つの文書（`posts:<オリジン>`、`kind: "page"`）にして送るので、9.2 の
+  `input`（リンクと書式の印）、9.3 の順（見えている項目として急ぐ）、9.4 の翻訳先・文体・文脈がそのまま効く。待っている
+  投稿がなくなれば `close` する。アプリ側に専用のメッセージはない。
+- 訳文は投稿の本文の要素の写しに入れ、本文は隠す。サイト（React）が描き直す要素の中身には触らない。
+- X が Grok で自動的に訳した投稿は、X の「原文を表示」を押して原文を出してから訳す。拡張機能のメニューの「Grok の自動翻訳」を
+  「PLaMoで訳す」にすると、これを見つけしだい自動で行う（設定は拡張機能が持つ。X だけの表示の好みなので、Webサイトの設定には
+  入れない）。
+- サイトの動作が「オフ」ならボタンを出さない。ページ翻訳が動いているあいだも出さない。
+- サイトごとの DOM と、足し方は [BrowserExtension/README.md](../BrowserExtension/README.md) と
+  [BROWSER_EXTENSION_NOTES.md](BROWSER_EXTENSION_NOTES.md)。
+

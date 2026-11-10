@@ -1,7 +1,7 @@
 /**
  * What the toolbar menu (popup) offers for the page it was opened on. The content script collects them from the
- * page's features; the popup draws them and sends the chosen one back. A page without the content script (any
- * site but YouTube until asked) gets the actions in `INJECTABLE_ACTIONS`, which inject it first.
+ * page's features; the popup draws them and sends the chosen one back. A page without the content script (a site
+ * it does not run on by itself, until asked) gets the actions in `INJECTABLE_ACTIONS`, which inject it first.
  */
 export type ActionIcon = "translate" | "restore" | "sidebar" | "captions" | "automatic" | "pause" | "resume";
 

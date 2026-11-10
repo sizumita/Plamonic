@@ -24,8 +24,12 @@ const DEV_KEY =
 /** Plamonic's native host (Contents/Helpers/plamonic-chrome-host, registered by the app at launch). */
 const NATIVE_HOST = "io.smdr.plamonic";
 
-/** Sites the content script runs on. A feature for a new site adds its pattern here (and in features/index.ts). */
-const CONTENT_MATCHES = ["https://www.youtube.com/*"];
+/** Where the YouTube captions feature runs, with its hook in the page's own world. */
+const YOUTUBE_MATCHES = ["https://www.youtube.com/*"];
+/** The sites of the post buttons feature (src/features/posts): a new PostSite adds its address here. */
+const POST_MATCHES = ["https://www.youtube.com/*", "https://x.com/*", "https://pro.x.com/*"];
+/** Sites the content script runs on by itself. A feature for a new site adds its pattern (and itself to features/index.ts). */
+const CONTENT_MATCHES = [...new Set([...YOUTUBE_MATCHES, ...POST_MATCHES])];
 
 function manifest(browser) {
   const icons = { 16: "icons/16.png", 32: "icons/32.png", 48: "icons/48.png", 128: "icons/128.png" };
@@ -47,14 +51,14 @@ function manifest(browser) {
     content_scripts: [{ matches: CONTENT_MATCHES, js: ["content.js"], run_at: "document_start" }],
     web_accessible_resources: [
       // page-hook.js runs in the page's own world.
-      { resources: ["page-hook.js"], matches: CONTENT_MATCHES },
+      { resources: ["page-hook.js"], matches: YOUTUBE_MATCHES },
     ],
   };
   if (browser === "chrome") {
     // Chrome loads the YouTube hook into the page's own world before the player starts. (Safari has no
     // "world": "MAIN" content scripts: the content script inserts it, features/youtube/index.ts.)
     base.content_scripts.unshift({
-      matches: CONTENT_MATCHES, js: ["page-hook.js"], run_at: "document_start", world: "MAIN",
+      matches: YOUTUBE_MATCHES, js: ["page-hook.js"], run_at: "document_start", world: "MAIN",
     });
     base.permissions.push("sidePanel");
     base.side_panel = { default_path: "sidebar.html" };

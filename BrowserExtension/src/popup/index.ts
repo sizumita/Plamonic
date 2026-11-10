@@ -7,8 +7,8 @@ import STYLE from "./style.css";
 
 /**
  * The toolbar menu: what Plamonic can do on this page. The page's content script lists its actions; on a site
- * without it (anything but YouTube until asked), the menu offers what can be injected, such as translating the
- * page. The sidebar is one of the items, on pages that have something for it.
+ * without it (one the extension does not run on by itself, until asked), the menu offers what can be injected,
+ * such as translating the page. The sidebar is one of the items, on pages that have something for it.
  */
 const style = document.createElement("style");
 style.textContent = STYLE;

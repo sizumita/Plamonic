@@ -66,6 +66,8 @@ export interface FeatureContext {
   finished(): void;
   /** This site's settings in the app (Settings › Webサイト), once known; undefined when the app is not reachable. */
   site(): SiteInfo | undefined;
+  /** Whether another feature runs on this page now (by its id), for features that must not do the same work twice. */
+  isRunning(featureID: string): boolean;
   /** Stops the feature and keeps it from starting by itself on this site until resumed from the menu. */
   pauseSite(): void;
 }

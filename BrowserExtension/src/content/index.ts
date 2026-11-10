@@ -167,6 +167,7 @@ class ContentHost {
       toggleSidebar: () => void this.toggleSidebar(),
       finished: () => this.stop(feature.id),
       site: () => this.site,
+      isRunning: (id) => this.running.has(id),
       pauseSite: () => {
         if (!this.site) return;
         this.paused = true;
