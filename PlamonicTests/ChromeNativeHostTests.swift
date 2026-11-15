@@ -52,7 +52,9 @@ final class ChromeNativeHostTests: XCTestCase {
         XCTAssertEqual(manifest["name"] as? String, "io.smdr.plamonic")
         XCTAssertEqual(manifest["path"] as? String, helper.path)
         XCTAssertEqual(manifest["type"] as? String, "stdio")
-        XCTAssertEqual(manifest["allowed_origins"] as? [String], ["chrome-extension://bdoanndchiakcnoejbbjabpenbgbkfcb/"])
+        XCTAssertEqual(
+            manifest["allowed_origins"] as? [String],
+            ["chrome-extension://bdoanndchiakcnoejbbjabpenbgbkfcb/", "chrome-extension://mmgdjnakcmnjbhlfhmakebglcidgmenp/"])
         XCTAssertEqual(ChromeNativeHostInstaller.installedBrowsers(appBundle: app, home: home), ["Google Chrome", "Brave"])
 
         // The app moved: the manifests follow it.
