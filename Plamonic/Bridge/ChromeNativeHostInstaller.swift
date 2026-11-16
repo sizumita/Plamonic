@@ -8,9 +8,12 @@ enum ChromeNativeHostInstaller {
     /// What the extension passes to `sendNativeMessage` (BrowserExtension/scripts/build.mjs).
     static let hostName = "io.smdr.plamonic"
     static let helperPath = "Contents/Helpers/plamonic-chrome-host"
-    /// Extensions allowed to use the host: the build from BrowserExtension/ (its manifest `key` fixes this ID).
-    /// Add the Chrome Web Store's ID here when the extension is published there.
-    static let extensionIDs = ["bdoanndchiakcnoejbbjabpenbgbkfcb"]
+    /// Extensions allowed to use the host: the build from BrowserExtension/ (its manifest `key` fixes this ID), and
+    /// the Chrome Web Store's item, whose ID the store gives it.
+    static let extensionIDs = [
+        "bdoanndchiakcnoejbbjabpenbgbkfcb",
+        "mmgdjnakcmnjbhlfhmakebglcidgmenp",
+    ]
     /// The extension to load unpacked in Chrome, which the build copies into the app from
     /// BrowserExtension/dist/chrome-unpacked: the app's own version, with the key of the ID above.
     static let extensionPath = "Contents/Resources/ChromeExtension"
